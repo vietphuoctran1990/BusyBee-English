@@ -1,0 +1,9 @@
+{
+  "name": "Copy of Busy Bee English",
+  "description": "Học tiếng Anh cùng Ong Chăm Chỉ và những người bạn AI.",
+  "icon": "pest_control_rodent",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://upload.wikimedia.org/wikipedia/commons/4/47/React.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Busy Bee English - Clay Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --clay-white: #ffffff;
+        --clay-blue: #3B82F6;
+        --clay-pink: #F472B6;
+        --clay-indigo: #6366F1;
+      }
+
+      body { 
+        font-family: 'Fredoka', sans-serif; 
+        overflow-x: hidden;
+        background-color: #E0F2FE;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        color: #1E293B;
+      }
+
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      /* Claymorphism Core - Soft & Tactile */
+      .clay-card {
+        background: #ffffff;
+        border-radius: 2rem;
+        box-shadow: 
+          inset -8px -8px 16px rgba(0, 0, 0, 0.02), 
+          inset 8px 8px 16px rgba(255, 255, 255, 0.8),
+          10px 10px 20px rgba(0, 0, 0, 0.05);
+        border: 4px solid #ffffff;
+      }
+      
+      @media (min-width: 1024px) {
+        .clay-card { border-radius: 3rem; border-width: 6px; }
+      }
+
+      .clay-button {
+        transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border-radius: 1.25rem;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+      }
+      
+      @media (min-width: 768px) {
+        .clay-button { border-radius: 2rem; }
+      }
+
+      .clay-button:active {
+        transform: translateY(2px) scale(0.96);
+      }
+
+      .clay-blue {
+        background: #3B82F6;
+        box-shadow: 
+          inset -4px -4px 8px rgba(0, 0, 0, 0.2), 
+          inset 4px 4px 8px rgba(255, 255, 255, 0.3),
+          0 8px 16px rgba(59, 130, 246, 0.2);
+      }
+      .clay-pink {
+        background: #F472B6;
+        box-shadow: 
+          inset -4px -4px 8px rgba(0, 0, 0, 0.15), 
+          inset 4px 4px 8px rgba(255, 255, 255, 0.3),
+          0 8px 16px rgba(244, 114, 182, 0.2);
+      }
+      .clay-indigo {
+        background: #6366F1;
+        box-shadow: 
+          inset -4px -4px 8px rgba(0, 0, 0, 0.15), 
+          inset 4px 4px 8px rgba(255, 255, 255, 0.3),
+          0 8px 16px rgba(99, 102, 241, 0.2);
+      }
+      .clay-white {
+        background: #ffffff;
+        box-shadow: 
+          inset -4px -4px 8px rgba(0, 0, 0, 0.03), 
+          inset 4px 4px 8px rgba(255, 255, 255, 1),
+          0 4px 12px rgba(0, 0, 0, 0.04);
+      }
+
+      .clay-input {
+        background: #F8FAFC;
+        box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+        border-radius: 1.25rem;
+        border: 2px solid #F1F5F9;
+      }
+
+      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      .animate-float { animation: float 4s ease-in-out infinite; }
+      
+      @keyframes scale-up { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      .animate-scale-up { animation: scale-up 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+      @keyframes rocket-launch {
+        0% { transform: translateY(0) rotate(0); }
+        20% { transform: translateY(2px) rotate(-2deg); }
+        100% { transform: translateY(-20px) rotate(5deg); opacity: 0; }
+      }
+      .launch-rocket { animation: rocket-launch 0.5s ease-in forwards; }
+
+      /* Safe areas for notched phones */
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+      .pt-safe { padding-top: env(safe-area-inset-top); }
+
+      /* Responsive Max Width for Large Screens */
+      .app-container {
+        max-width: 1440px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "@heroicons/react/": "https://aistudiocdn.com/@heroicons/react@^2.2.0/",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
