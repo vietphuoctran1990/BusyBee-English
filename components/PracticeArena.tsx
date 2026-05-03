@@ -24,8 +24,22 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
   const [canInteract, setCanInteract] = useState(false); 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [speakingScore, setSpeakingScore] = useState<number | null>(null);
+
   const isTransitioning = useRef(false);
+
+  const calcSimilarity = (a: string, b: string): number => {
+    const norm = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '');
+    const na = norm(a);
+    const nb = norm(b);
+    if (na === nb) return 1.0;
+    if (na.includes(nb) || nb.includes(na)) return 0.9;
+    const setA = new Set(na.split(''));
+    const setB = new Set(nb.split(''));
+    const intersection = [...setA].filter(c => setB.has(c)).length;
+    return intersection / Math.max(setA.size, setB.size);
+  };
   const recognitionRef = useRef<any>(null);
   const currentItem = items[currentIndex];
   const t = TRANSLATIONS[lang];
@@ -37,6 +51,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
     setUserSpelling('');
     setTranscript('');
     setShowHint(false);
+    setSpeakingScore(null);
     setCanInteract(false);
     isTransitioning.current = false;
 
@@ -71,17 +86,22 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
           const result = event.results[0][0].transcript.toLowerCase().trim();
           const target = currentItem.text.toLowerCase().trim();
           setTranscript(result);
-          
-          // Fuzzy matching đơn giản: Nếu từ bé nói có chứa từ mục tiêu hoặc ngược lại
-          if (result.includes(target) || target.includes(result)) {
+
+          const sim = calcSimilarity(result, target);
+          const score = Math.round(sim * 100);
+          setSpeakingScore(score);
+
+          if (sim >= 0.75) {
             handleNext(true);
           } else {
             setFeedback('incorrect');
             playSFX('click');
-            // Cho phép bé thử lại sau 1.5s
             setTimeout(() => {
-                if (!isTransitioning.current) setFeedback('none');
-            }, 1500);
+              if (!isTransitioning.current) {
+                setFeedback('none');
+                setSpeakingScore(null);
+              }
+            }, 2200);
           }
           setIsListening(false);
         };
@@ -142,7 +162,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
   };
 
   const handleExitEarly = () => {
-    onExit();
+    setShowExitConfirm(true);
   };
 
   if (isFinished) {
@@ -163,6 +183,30 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#F0F9FF] flex flex-col pt-safe pb-safe overflow-hidden">
+      {/* Exit Confirmation */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[200] bg-blue-900/70 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+          <div className="clay-card bg-white p-8 md:p-12 max-w-sm w-full text-center animate-scale-up">
+            <div className="text-5xl mb-4">🤔</div>
+            <h3 className="text-2xl md:text-3xl font-black text-blue-900 mb-2">{t.exitConfirmTitle}</h3>
+            <p className="text-blue-400 font-bold mb-8 text-sm md:text-base">{t.exitConfirmMsg}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="flex-1 py-4 clay-button clay-blue text-white font-black text-lg"
+              >
+                {t.keepPlaying}
+              </button>
+              <button
+                onClick={() => onExit()}
+                className="flex-1 py-4 bg-red-100 text-red-500 rounded-[1.5rem] font-black text-lg hover:bg-red-200 transition-all"
+              >
+                {t.endPractice}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header - Phù hợp màn hình rộng */}
       <div className="w-full max-w-[1440px] mx-auto px-4 py-3 md:py-8 flex items-center gap-3 md:gap-12 shrink-0">
           <button 
@@ -317,9 +361,18 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
                     </div>
                     
                     {transcript && (
-                       <div className="mt-10 bg-white/70 p-6 md:p-10 rounded-3xl border-4 border-dashed border-indigo-100 animate-fade-in shadow-inner">
-                          <p className="text-xs md:text-2xl font-black text-indigo-300 uppercase tracking-widest mb-2">Máy nghe thấy:</p>
-                          <p className="text-xl md:text-5xl font-bold text-indigo-600 italic">"{transcript}"</p>
+                       <div className="mt-6 space-y-3">
+                         <div className="bg-white/70 p-4 md:p-8 rounded-3xl border-4 border-dashed border-indigo-100 animate-fade-in shadow-inner">
+                           <p className="text-xs md:text-xl font-black text-indigo-300 uppercase tracking-widest mb-1">Máy nghe thấy:</p>
+                           <p className="text-lg md:text-4xl font-bold text-indigo-600 italic">"{transcript}"</p>
+                         </div>
+                         {speakingScore !== null && (
+                           <div className={`p-4 md:p-6 rounded-2xl font-black text-center animate-fade-in ${speakingScore >= 75 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                             <span className="text-2xl md:text-4xl">{speakingScore >= 75 ? '🎉' : '💪'}</span>
+                             <span className="ml-3 text-lg md:text-3xl">{t.speakAccuracy}: {speakingScore}%</span>
+                             {speakingScore < 75 && <p className="text-sm md:text-xl mt-1 font-bold">{t.speakTryAgain}</p>}
+                           </div>
+                         )}
                        </div>
                     )}
                   </div>
