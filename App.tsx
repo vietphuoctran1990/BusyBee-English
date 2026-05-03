@@ -14,6 +14,7 @@ import SettingsModal from './components/SettingsModal';
 import SlideshowModal from './components/SlideshowModal';
 import StoryCreationSetup from './components/StoryCreationSetup';
 import LoginScreen from './components/LoginScreen';
+import NotificationPrompt from './components/NotificationPrompt';
 import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType } from './types';
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
@@ -30,6 +31,7 @@ import { playSFX } from './services/audioUtils';
 const USER_KEY = 'kidlingo_user_clay_v2';
 const STATS_KEY = 'kidlingo_stats_clay_v2';
 const SETTINGS_KEY = 'kidlingo_settings_clay_v2';
+const NOTIF_KEY = 'busybee_notif_prefs';
 
 type SortOrder = 'newest' | 'oldest' | 'alpha';
 
@@ -95,6 +97,8 @@ const App: React.FC = () => {
   const [practiceGame, setPracticeGame] = useState<{ active: boolean; type: GameType; items: LearningItem[] }>({ active: false, type: 'listening', items: [] });
   const [hasCustomKey, setHasCustomKey] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const notifPromptShownRef = useRef(false);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
@@ -135,6 +139,72 @@ const App: React.FC = () => {
     };
     checkKey();
   }, []);
+
+  // Re-schedule reminder on app load if previously enabled
+  useEffect(() => {
+    if (!currentUser) return;
+    try {
+      const saved = localStorage.getItem(NOTIF_KEY);
+      if (!saved) return;
+      const prefs = JSON.parse(saved);
+      if (prefs.enabled && Notification.permission === 'granted') {
+        // Wait for SW to be ready then schedule
+        navigator.serviceWorker?.ready.then(reg => {
+          reg.active?.postMessage({ type: 'SCHEDULE_REMINDER', hour: prefs.hour ?? 8, minute: 0, lang: settings.language });
+        }).catch(() => {});
+      }
+    } catch {}
+  }, [currentUser]); // eslint-disable-line
+
+  // Show notification prompt after 45s on first session if permission not yet decided
+  useEffect(() => {
+    if (!currentUser || notifPromptShownRef.current) return;
+    if (!('Notification' in window)) return;
+    try {
+      const saved = localStorage.getItem(NOTIF_KEY);
+      if (saved) return; // User already responded
+    } catch {}
+    if (Notification.permission !== 'default') return;
+    const timer = setTimeout(() => {
+      if (!notifPromptShownRef.current) {
+        notifPromptShownRef.current = true;
+        setShowNotifPrompt(true);
+      }
+    }, 45000);
+    return () => clearTimeout(timer);
+  }, [currentUser]);
+
+  const scheduleReminder = (hour: number) => {
+    try {
+      const reg = navigator.serviceWorker?.controller;
+      if (reg) {
+        reg.postMessage({ type: 'SCHEDULE_REMINDER', hour, minute: 0, lang: settings.language });
+      }
+    } catch {}
+  };
+
+  const handleNotifConfirm = async (hour: number) => {
+    setShowNotifPrompt(false);
+    try {
+      if (!('Notification' in window)) return;
+      const permission = await Notification.requestPermission();
+      const prefs = { enabled: permission === 'granted', hour, dismissedAt: null };
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(prefs));
+      if (permission === 'granted') {
+        scheduleReminder(hour);
+        setGlobalError(t.notifGranted);
+        if (globalErrorTimerRef.current) clearTimeout(globalErrorTimerRef.current);
+        globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 4000);
+      }
+    } catch {}
+  };
+
+  const handleNotifDismiss = () => {
+    setShowNotifPrompt(false);
+    try {
+      localStorage.setItem(NOTIF_KEY, JSON.stringify({ enabled: false, dismissedAt: new Date().toISOString() }));
+    } catch {}
+  };
 
   useEffect(() => { try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {} }, [stats]);
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
@@ -439,6 +509,15 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe" onClick={() => setZoomedImage(null)}>
           <img src={zoomedImage} className="max-w-full max-h-full rounded-[2.5rem] md:rounded-[4rem] shadow-2xl animate-scale-up border-4 md:border-8 border-white" />
         </div>
+      )}
+
+      {/* Daily Reminder Prompt */}
+      {showNotifPrompt && (
+        <NotificationPrompt
+          lang={settings.language}
+          onConfirm={handleNotifConfirm}
+          onDismiss={handleNotifDismiss}
+        />
       )}
 
       {/* Global Error Toast */}

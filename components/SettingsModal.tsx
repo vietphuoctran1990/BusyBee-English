@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BellIcon, BellSlashIcon, ClockIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { UserProfile, AppSettings, LanguageType, AccentType, UserStats } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
@@ -24,6 +24,15 @@ const AVATARS = [
   '🍓', '🍕', '🍦', '🍭', '🍩', '🎨', '🎸', '⚽', '🎮', '🧘‍♂️', '🧗‍♀️', '☕', '💼',
 ];
 
+const NOTIF_KEY = 'busybee_notif_prefs';
+const HOUR_OPTIONS = [7, 8, 9, 12, 15, 17, 19, 20, 21];
+
+function formatHour(h: number) {
+  const suffix = h < 12 ? 'AM' : 'PM';
+  const display = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${display}:00 ${suffix}`;
+}
+
 const SettingsModal: React.FC<SettingsModalProps> = ({
   user, settings, stats, onClose, onUpdateUser, onUpdateSettings, onSelectKey, hasCustomKey, onExportData, onImportData,
 }) => {
@@ -32,6 +41,58 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [importFeedback, setImportFeedback] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = TRANSLATIONS[tempSettings.language || 'vn'];
+
+  // Notification prefs state
+  const [notifPrefs, setNotifPrefs] = useState<{ enabled: boolean; hour: number } | null>(() => {
+    try {
+      const s = localStorage.getItem(NOTIF_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const [notifHour, setNotifHour] = useState(notifPrefs?.hour ?? 8);
+  const notifSupported = typeof window !== 'undefined' && 'Notification' in window;
+  const notifPermission = notifSupported ? Notification.permission : 'denied';
+
+  const handleToggleNotif = async () => {
+    if (!notifSupported) return;
+    if (notifPrefs?.enabled) {
+      // Disable
+      const updated = { ...notifPrefs, enabled: false };
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+      setNotifPrefs(updated);
+      try {
+        navigator.serviceWorker?.controller?.postMessage({ type: 'CANCEL_REMINDER' });
+      } catch {}
+    } else {
+      // Enable — request permission if needed
+      let perm = notifPermission;
+      if (perm === 'default') {
+        perm = await Notification.requestPermission();
+      }
+      if (perm === 'granted') {
+        const updated = { enabled: true, hour: notifHour };
+        localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+        setNotifPrefs(updated);
+        try {
+          navigator.serviceWorker?.ready.then(reg => {
+            reg.active?.postMessage({ type: 'SCHEDULE_REMINDER', hour: notifHour, minute: 0, lang: tempSettings.language });
+          });
+        } catch {}
+      }
+    }
+  };
+
+  const handleHourChange = (h: number) => {
+    setNotifHour(h);
+    if (notifPrefs?.enabled) {
+      const updated = { ...notifPrefs, hour: h };
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(updated));
+      setNotifPrefs(updated);
+      try {
+        navigator.serviceWorker?.controller?.postMessage({ type: 'SCHEDULE_REMINDER', hour: h, minute: 0, lang: tempSettings.language });
+      } catch {}
+    }
+  };
 
   const handleSave = () => {
     onUpdateUser(tempUser);
@@ -231,6 +292,52 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           </section>
+
+          {/* Daily Reminder Section */}
+          {notifSupported && notifPermission !== 'denied' && (
+            <section className="space-y-4">
+              <h3 className="text-sm font-black text-blue-500 uppercase tracking-widest flex items-center gap-2 border-b-2 border-blue-50 pb-2">
+                <BellIcon className="w-5 h-5" /> {t.notifSettingsTitle}
+              </h3>
+              <div className={`p-5 rounded-[2.5rem] border-2 transition-all ${notifPrefs?.enabled ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-black text-blue-900 text-sm">{t.notifSettingsDesc}</p>
+                    {notifPrefs?.enabled && (
+                      <p className="text-xs text-blue-500 font-bold mt-1 flex items-center gap-1">
+                        <ClockIcon className="w-3.5 h-3.5" /> {formatHour(notifHour)}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleToggleNotif}
+                    className={`px-4 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 ${notifPrefs?.enabled ? 'bg-red-50 text-red-500 border border-red-200 hover:bg-red-100' : 'bg-blue-500 text-white shadow-md hover:bg-blue-600'}`}
+                  >
+                    {notifPrefs?.enabled
+                      ? <><BellSlashIcon className="w-4 h-4" />{t.notifDisable}</>
+                      : <><BellIcon className="w-4 h-4" />{t.notifEnable}</>
+                    }
+                  </button>
+                </div>
+                {notifPrefs?.enabled && (
+                  <div>
+                    <p className="text-xs font-black text-blue-400 uppercase tracking-wider mb-2">{t.notifTimeLabel}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {HOUR_OPTIONS.map(h => (
+                        <button
+                          key={h}
+                          onClick={() => handleHourChange(h)}
+                          className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all ${notifHour === h ? 'bg-blue-500 text-white shadow-md' : 'bg-white text-blue-400 border border-blue-100 hover:bg-blue-50'}`}
+                        >
+                          {formatHour(h)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Fix #6: Backup Section */}
           <section className="space-y-4">

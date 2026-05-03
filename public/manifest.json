@@ -1,0 +1,38 @@
+{
+  "name": "Busy Bee English",
+  "short_name": "BusyBee",
+  "description": "Học tiếng Anh vui nhộn cho bé với AI",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#E0F2FE",
+  "theme_color": "#3B82F6",
+  "lang": "vi",
+  "categories": ["education", "kids"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Tạo thẻ mới",
+      "short_name": "Tạo thẻ",
+      "description": "Tạo thẻ học mới ngay",
+      "url": "/?tab=create",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Luyện tập",
+      "short_name": "Luyện tập",
+      "description": "Bắt đầu luyện tập",
+      "url": "/?tab=practice",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ]
+}
