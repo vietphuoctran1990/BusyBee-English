@@ -103,9 +103,16 @@ const App: React.FC = () => {
   const [practiceGame, setPracticeGame] = useState<{ active: boolean, type: GameType, items: LearningItem[] }>({ active: false, type: 'listening', items: [] });
   const [hasCustomKey, setHasCustomKey] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
+
+  const showGlobalError = useCallback((msg: string) => {
+    setGlobalError(msg);
+    if (globalErrorTimerRef.current) clearTimeout(globalErrorTimerRef.current);
+    globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
@@ -116,9 +123,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkKey = async () => {
-      if (window.aistudio?.hasSelectedApiKey) {
-        setHasCustomKey(await window.aistudio.hasSelectedApiKey());
-      }
+      try {
+        if ((window as any).aistudio?.hasSelectedApiKey) {
+          setHasCustomKey(await (window as any).aistudio.hasSelectedApiKey());
+        }
+      } catch {}
     };
     checkKey();
   }, []);
@@ -186,12 +195,12 @@ const App: React.FC = () => {
     } catch (e: any) {
       console.error("Creation error", e);
       const isQuotaError = e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED") || e.message?.includes("503") || e.message?.includes("UNAVAILABLE");
-      const errorMsg = isQuotaError 
-        ? "Bé ơi, chú Ong cần nghỉ ngơi một xíu vì mệt quá rồi! Hãy thử lại sau hoặc nhờ ba mẹ dùng mã PRO nhé!" 
+      const errorMsg = isQuotaError
+        ? "Bé ơi, chú Ong cần nghỉ ngơi một xíu vì mệt quá rồi! Hãy thử lại sau hoặc nhờ ba mẹ dùng mã PRO nhé!"
         : "Ôi, có lỗi nhỏ rồi! Bé thử lại nha!";
-        
+
       setItems(prev => prev.map(i => i.id === itemId ? { ...i, loading: false, error: errorMsg } : i));
-      if (isQuotaError) setGlobalError(errorMsg);
+      if (isQuotaError) showGlobalError(errorMsg);
     }
   }, [settings.accent, currentUser]);
 
@@ -228,9 +237,9 @@ const App: React.FC = () => {
         const story = await generateStory(words.map(w => w.text));
         setActiveStory(story);
         playSFX('success');
-    } catch (e: any) { 
-         console.error(e);
-         if (e.message?.includes("429")) setGlobalError("Bé ơi, chú Ong mệt rồi, chưa viết truyện được! Thử lại sau nha!");
+    } catch (e: any) {
+        console.error(e);
+        showGlobalError("Bé ơi, chú Ong mệt rồi, chưa viết truyện được! Thử lại sau nha!");
     }
     setIsGeneratingStory(false);
   };
@@ -258,7 +267,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F0F9FF] pb-32 lg:pb-12">
       {showIntroModal && <IntroModal onClose={() => setShowIntroModal(false)} lang={settings.language} />}
-      {showSettings && <SettingsModal user={currentUser} settings={settings} onClose={() => setShowSettings(false)} onUpdateUser={setCurrentUser} onUpdateSettings={setSettings} onSelectKey={async () => { await window.aistudio.openSelectKey(); setHasCustomKey(true); }} hasCustomKey={hasCustomKey} />}
+      {showSettings && <SettingsModal user={currentUser} settings={settings} onClose={() => setShowSettings(false)} onUpdateUser={setCurrentUser} onUpdateSettings={setSettings} onSelectKey={async () => { try { await (window as any).aistudio?.openSelectKey?.(); setHasCustomKey(true); } catch {} }} hasCustomKey={hasCustomKey} />}
       {showStickerBook && <StickerBookModal stars={stats.stars} unlockedStickers={stats.unlockedStickers} stickers={ALL_STICKERS} onClose={() => setShowStickerBook(false)} onUnlock={(id, cost) => setStats(s => ({...s, stars: s.stars - cost, unlockedStickers: [...(s.unlockedStickers || []), id]}))} lang={settings.language} />}
       {showSlideshow && <SlideshowModal items={filteredItems} onClose={() => setShowSlideshow(false)} lang={settings.language} />}
       
@@ -297,6 +306,19 @@ const App: React.FC = () => {
       }} isSaved={stories.some(s => s.id === activeStory.id)} lang={settings.language} />}
       
       {zoomedImage && <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe" onClick={() => setZoomedImage(null)}><img src={zoomedImage} className="max-w-full max-h-full rounded-[2.5rem] md:rounded-[4rem] shadow-2xl animate-scale-up border-4 md:border-8 border-white" /></div>}
+
+      {/* Global Error Toast */}
+      {globalError && (
+        <div className="fixed bottom-28 md:bottom-8 left-1/2 -translate-x-1/2 z-[250] max-w-sm w-[90%] animate-fade-in">
+          <div className="bg-orange-500 text-white px-5 py-4 rounded-[1.5rem] shadow-2xl flex items-start gap-3 border-2 border-orange-400">
+            <ExclamationTriangleIcon className="w-6 h-6 shrink-0 mt-0.5" />
+            <p className="font-bold text-sm leading-snug flex-1">{globalError}</p>
+            <button onClick={() => setGlobalError(null)} className="shrink-0 p-1 hover:bg-white/20 rounded-lg transition-all">
+              <XMarkIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Container - Tối ưu 1440px */}
       <div className="max-w-[1440px] mx-auto px-4 md:px-10 lg:px-16 pt-4 md:pt-10">

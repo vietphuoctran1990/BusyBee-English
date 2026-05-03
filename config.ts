@@ -1,26 +1,27 @@
 
 export const API_CONFIG = {
-  // Thay đổi URL này thành địa chỉ hosting thực tế của bạn
-  BASE_URL: window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://your-hosting-domain.com',
+  BASE_URL: typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : window.location.origin,
   ENDPOINTS: {
     REGISTER: '/api/register',
     LOGIN: '/api/login',
-    SYNC: '/api/sync'
-  }
+    SYNC: '/api/sync',
+  },
 };
 
 export const CONFIG = {
-    APP_NAME: 'KidLingo AI Pro',
-    DB_NAME: 'KidLingo_V3_Secure',
-    BACKUP_FILE_NAME: 'kidlingo_backup.json',
-    GOOGLE_CLIENT_ID: ''
+  APP_NAME: 'Busy Bee English',
+  DB_NAME: 'BusyBee_V3',
+  BACKUP_FILE_NAME: 'busybee_backup.json',
+  GOOGLE_CLIENT_ID: '',
 };
 
 export const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
