@@ -18,6 +18,8 @@ interface SettingsModalProps {
   onExportData: () => void;
   onImportData: (data: any) => void;
   syncCode?: string;
+  isSyncing?: boolean;
+  onSyncNow?: () => Promise<boolean>;
   onLinkCode?: (code: string) => Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }>;
 }
 
@@ -38,7 +40,7 @@ function formatHour(h: number) {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   user, settings, stats, onClose, onUpdateUser, onUpdateSettings, onSelectKey, hasCustomKey, onExportData, onImportData,
-  syncCode, onLinkCode,
+  syncCode, isSyncing, onSyncNow, onLinkCode,
 }) => {
   const [tempUser, setTempUser] = useState<UserProfile>({ ...user });
   const [tempSettings, setTempSettings] = useState<AppSettings>({ ...settings });
@@ -62,6 +64,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isLinking, setIsLinking] = useState(false);
   const [linkStatus, setLinkStatus] = useState<{ success: boolean; errorType?: 'not_found' | 'firebase_error' } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pushStatus, setPushStatus] = useState<'idle' | 'pushing' | 'ok' | 'fail'>('idle');
 
   const handleToggleNotif = async () => {
     if (!notifSupported) return;
@@ -102,6 +105,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         navigator.serviceWorker?.controller?.postMessage({ type: 'SCHEDULE_REMINDER', hour: h, minute: 0, lang: tempSettings.language });
       } catch {}
     }
+  };
+
+  const handlePushNow = async () => {
+    if (!onSyncNow) return;
+    setPushStatus('pushing');
+    const ok = await onSyncNow();
+    setPushStatus(ok ? 'ok' : 'fail');
+    setTimeout(() => setPushStatus('idle'), 3000);
   };
 
   const handleCopyCode = () => {
@@ -388,10 +399,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
                 <p className="text-xs text-indigo-400 font-bold">{t.syncCodeDesc}</p>
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                  <span className="text-xs font-black text-green-600">{t.syncLive}</span>
-                </div>
+
+                {/* Sync Now button */}
+                <button
+                  onClick={handlePushNow}
+                  disabled={pushStatus === 'pushing' || isSyncing}
+                  className={`w-full py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50
+                    ${pushStatus === 'ok' ? 'bg-green-500 text-white' : pushStatus === 'fail' ? 'bg-red-100 text-red-600' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
+                >
+                  <CloudArrowUpIcon className={`w-4 h-4 ${(pushStatus === 'pushing' || isSyncing) ? 'animate-bounce' : ''}`} />
+                  {pushStatus === 'pushing' || isSyncing
+                    ? (tempSettings.language === 'vn' ? 'Đang gửi...' : 'Syncing...')
+                    : pushStatus === 'ok'
+                      ? (tempSettings.language === 'vn' ? '✓ Đã gửi lên cloud!' : '✓ Uploaded!')
+                      : pushStatus === 'fail'
+                        ? (tempSettings.language === 'vn' ? '✗ Gửi thất bại' : '✗ Upload failed')
+                        : (tempSettings.language === 'vn' ? 'Gửi dữ liệu lên cloud ngay' : 'Push data to cloud now')}
+                </button>
               </div>
 
               {/* Link another device */}

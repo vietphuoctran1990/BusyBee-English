@@ -542,6 +542,15 @@ const App: React.FC = () => {
           onExportData={handleExportData}
           onImportData={handleImportData}
           syncCode={syncCode}
+          isSyncing={isSyncing}
+          onSyncNow={async () => {
+            const ok = await uploadData(syncCode, {
+              items: items.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+              stories,
+              stats,
+            });
+            return ok;
+          }}
           onLinkCode={handleLinkCode}
         />
       )}
