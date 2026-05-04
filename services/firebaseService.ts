@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   initializeFirestore,
+  getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
   doc,
@@ -23,12 +24,22 @@ let db: ReturnType<typeof initializeFirestore> | null = null;
 if (IS_FIREBASE_ENABLED) {
   try {
     const app = initializeApp(FIREBASE_CONFIG);
-    // Firebase 10+ offline persistence API
-    db = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    });
+    try {
+      // Multi-tab persistence (best, but fails on some iOS Safari configs)
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    } catch {
+      try {
+        // Single-tab persistence fallback
+        db = initializeFirestore(app, { localCache: persistentLocalCache() });
+      } catch {
+        // No persistence — still works online (iOS private mode, etc.)
+        db = getFirestore(app) as any;
+      }
+    }
   } catch (e) {
     console.warn('[Firebase] Init failed:', e);
   }

@@ -491,7 +491,7 @@ const App: React.FC = () => {
   };
 
   const handleLinkCode = async (newCode: string): Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }> => {
-    if (!IS_FIREBASE_ENABLED || !isFirestoreReady()) return { success: false, errorType: 'firebase_error' };
+    if (!IS_FIREBASE_ENABLED) return { success: false, errorType: 'firebase_error' };
     const upperCode = newCode.toUpperCase();
     const result = await checkSyncCodeExists(upperCode);
     if (result === 'error') return { success: false, errorType: 'firebase_error' };
