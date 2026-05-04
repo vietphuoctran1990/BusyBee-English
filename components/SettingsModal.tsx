@@ -1,9 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BellIcon, BellSlashIcon, ClockIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BellIcon, BellSlashIcon, ClockIcon, CloudArrowUpIcon, DocumentDuplicateIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { UserProfile, AppSettings, LanguageType, AccentType, UserStats } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
+import { IS_FIREBASE_ENABLED } from '../config';
 
 interface SettingsModalProps {
   user: UserProfile;
@@ -16,6 +17,8 @@ interface SettingsModalProps {
   hasCustomKey: boolean;
   onExportData: () => void;
   onImportData: (data: any) => void;
+  syncCode?: string;
+  onLinkCode?: (code: string) => Promise<{ success: boolean }>;
 }
 
 const AVATARS = [
@@ -35,6 +38,7 @@ function formatHour(h: number) {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   user, settings, stats, onClose, onUpdateUser, onUpdateSettings, onSelectKey, hasCustomKey, onExportData, onImportData,
+  syncCode, onLinkCode,
 }) => {
   const [tempUser, setTempUser] = useState<UserProfile>({ ...user });
   const [tempSettings, setTempSettings] = useState<AppSettings>({ ...settings });
@@ -52,6 +56,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [notifHour, setNotifHour] = useState(notifPrefs?.hour ?? 8);
   const notifSupported = typeof window !== 'undefined' && 'Notification' in window;
   const notifPermission = notifSupported ? Notification.permission : 'denied';
+
+  // Sync section state
+  const [linkInput, setLinkInput] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkStatus, setLinkStatus] = useState<{ success: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleToggleNotif = async () => {
     if (!notifSupported) return;
@@ -92,6 +102,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         navigator.serviceWorker?.controller?.postMessage({ type: 'SCHEDULE_REMINDER', hour: h, minute: 0, lang: tempSettings.language });
       } catch {}
     }
+  };
+
+  const handleCopyCode = () => {
+    if (!syncCode) return;
+    navigator.clipboard?.writeText(syncCode).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleLinkDevice = async () => {
+    if (!onLinkCode || linkInput.length !== 6) return;
+    setIsLinking(true);
+    setLinkStatus(null);
+    const result = await onLinkCode(linkInput);
+    setLinkStatus(result);
+    setIsLinking(false);
+    if (result.success) setLinkInput('');
   };
 
   const handleSave = () => {
@@ -334,6 +361,64 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Cloud Sync Section */}
+          {IS_FIREBASE_ENABLED && syncCode && (
+            <section className="space-y-4">
+              <h3 className="text-sm font-black text-blue-500 uppercase tracking-widest flex items-center gap-2 border-b-2 border-blue-50 pb-2">
+                <CloudArrowUpIcon className="w-5 h-5" /> {t.syncSection}
+              </h3>
+
+              {/* Sync code display */}
+              <div className="bg-indigo-50 border-2 border-indigo-100 rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-black text-indigo-500 uppercase tracking-wider">{t.syncCode}</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white border-2 border-indigo-200 rounded-xl px-4 py-3 font-mono text-xl font-black text-indigo-700 text-center tracking-[0.3em] select-all">
+                    {syncCode}
+                  </div>
+                  <button
+                    onClick={handleCopyCode}
+                    className={`p-3 rounded-xl transition-all active:scale-90 ${copied ? 'bg-green-500 text-white' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
+                  >
+                    {copied ? <CheckIcon className="w-5 h-5" /> : <DocumentDuplicateIcon className="w-5 h-5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-indigo-400 font-bold">{t.syncCodeDesc}</p>
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                  <span className="text-xs font-black text-green-600">{t.syncLive}</span>
+                </div>
+              </div>
+
+              {/* Link another device */}
+              <div className="space-y-3">
+                <p className="text-xs font-black text-blue-500 uppercase tracking-wider">{t.syncLink}</p>
+                <p className="text-xs text-orange-400 font-bold">{t.syncLinkWarn}</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={linkInput}
+                    onChange={e => { setLinkInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); setLinkStatus(null); }}
+                    placeholder={t.syncLinkPlaceholder}
+                    maxLength={6}
+                    className="flex-1 px-4 py-3 rounded-xl border-2 border-blue-100 font-mono font-black text-xl text-blue-900 text-center tracking-[0.2em] outline-none focus:border-blue-400 bg-white"
+                  />
+                  <button
+                    onClick={handleLinkDevice}
+                    disabled={linkInput.length !== 6 || isLinking}
+                    className="px-5 py-3 bg-blue-600 text-white font-black rounded-xl shadow-md disabled:opacity-50 hover:bg-blue-700 transition-all active:scale-95 text-sm"
+                  >
+                    {isLinking ? t.syncLinking : t.syncLinkBtn}
+                  </button>
+                </div>
+                {linkStatus !== null && (
+                  <p className={`text-sm font-bold ${linkStatus.success ? 'text-green-600' : 'text-red-500'}`}>
+                    {linkStatus.success ? t.syncLinked : t.syncLinkError}
+                  </p>
                 )}
               </div>
             </section>

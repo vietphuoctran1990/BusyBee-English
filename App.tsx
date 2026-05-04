@@ -19,11 +19,19 @@ import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, S
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
 import {
+  saveItemToCloud, saveItemsBatchToCloud, deleteItemFromCloud,
+  saveStoryToCloud, deleteStoryFromCloud,
+  saveStatsToCloud,
+  subscribeToItems, subscribeToStories, subscribeToStats,
+  generateSyncCode, checkSyncCodeExists, downloadSyncData,
+} from './services/firebaseService';
+import { IS_FIREBASE_ENABLED } from './config';
+import {
   HeartIcon, HomeIcon, MagnifyingGlassIcon,
   TrophyIcon, StarIcon, BookOpenIcon,
   UsersIcon, KeyIcon, PlayIcon, SparklesIcon,
   ExclamationTriangleIcon, XMarkIcon, IdentificationIcon, ArrowPathIcon, TrashIcon, TagIcon,
-  FunnelIcon, FireIcon, ChartBarIcon,
+  FunnelIcon, FireIcon, ChartBarIcon, CloudArrowUpIcon,
 } from '@heroicons/react/24/solid';
 import { TRANSLATIONS } from './utils/translations';
 import { playSFX } from './services/audioUtils';
@@ -32,6 +40,7 @@ const USER_KEY = 'kidlingo_user_clay_v2';
 const STATS_KEY = 'kidlingo_stats_clay_v2';
 const SETTINGS_KEY = 'kidlingo_settings_clay_v2';
 const NOTIF_KEY = 'busybee_notif_prefs';
+const SYNC_KEY = 'busybee_sync_code';
 
 type SortOrder = 'newest' | 'oldest' | 'alpha';
 
@@ -100,6 +109,19 @@ const App: React.FC = () => {
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const notifPromptShownRef = useRef(false);
 
+  // Sync code — stable ID shared across devices for Firestore path
+  const [syncCode, setSyncCode] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(SYNC_KEY);
+      if (saved) return saved;
+      const code = generateSyncCode();
+      localStorage.setItem(SYNC_KEY, code);
+      return code;
+    } catch { return generateSyncCode(); }
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncUnsubsRef = useRef<(() => void)[]>([]);
+
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
   const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -110,13 +132,67 @@ const App: React.FC = () => {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
 
-  // Load data
+  // Load local data on startup (fast, from IndexedDB cache)
   useEffect(() => {
     if (currentUser) {
       loadItemsFromDB(currentUser.id).then(setItems);
       loadStoriesFromDB(currentUser.id).then(setStories);
     }
   }, [currentUser]);
+
+  // Firebase realtime sync — subscribes once user is logged in
+  useEffect(() => {
+    if (!currentUser || !IS_FIREBASE_ENABLED) return;
+
+    // Unsubscribe any previous listeners
+    syncUnsubsRef.current.forEach(u => u());
+    syncUnsubsRef.current = [];
+
+    setIsSyncing(true);
+
+    // Items: Firestore → local state + IndexedDB cache
+    syncUnsubsRef.current.push(
+      subscribeToItems(syncCode, (cloudItems) => {
+        if (!cloudItems.length) { setIsSyncing(false); return; }
+        setItems(cloudItems);
+        saveItemsToDB(cloudItems).catch(() => {});
+        setIsSyncing(false);
+      }),
+    );
+
+    // Stories: Firestore → local state
+    syncUnsubsRef.current.push(
+      subscribeToStories(syncCode, (cloudStories) => {
+        if (cloudStories.length) setStories(cloudStories);
+      }),
+    );
+
+    // Stats: merge cloud + local (take the higher values to avoid losing progress)
+    syncUnsubsRef.current.push(
+      subscribeToStats(syncCode, (cloudStats) => {
+        setStats(prev => {
+          const merged: UserStats = {
+            ...prev,
+            stars: Math.max(prev.stars || 0, cloudStats.stars || 0),
+            cardsCreated: Math.max(prev.cardsCreated || 0, cloudStats.cardsCreated || 0),
+            streak: cloudStats.streak || prev.streak || 0,
+            lastLoginDate: cloudStats.lastLoginDate || prev.lastLoginDate || '',
+            unlockedStickers: Array.from(new Set([
+              ...(prev.unlockedStickers || []),
+              ...(cloudStats.unlockedStickers || []),
+            ])),
+          };
+          try { localStorage.setItem(STATS_KEY, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
+      }),
+    );
+
+    return () => {
+      syncUnsubsRef.current.forEach(u => u());
+      syncUnsubsRef.current = [];
+    };
+  }, [currentUser, syncCode]); // eslint-disable-line
 
   // Streak calculation
   useEffect(() => {
@@ -206,7 +282,10 @@ const App: React.FC = () => {
     } catch {}
   };
 
-  useEffect(() => { try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {} }, [stats]);
+  useEffect(() => {
+    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {}
+    if (IS_FIREBASE_ENABLED && currentUser) saveStatsToCloud(syncCode, stats).catch(() => {});
+  }, [stats]); // eslint-disable-line
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
 
   const handleRewardStars = (amount: number) => {
@@ -254,6 +333,7 @@ const App: React.FC = () => {
 
       setItems(prev => prev.map(i => i.id === itemId ? finalItem : i));
       await saveItemsToDB([finalItem]);
+      if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, finalItem).catch(() => {});
       setStats(prev => ({ ...prev, cardsCreated: (prev.cardsCreated || 0) + 1 }));
       playSFX('pop');
     } catch (e: any) {
@@ -276,7 +356,10 @@ const App: React.FC = () => {
       setItems(prev => {
         const updated = prev.map(i => i.id === id ? { ...i, imageUrl: newImageUrl, isRegeneratingImage: false } : i);
         const target = updated.find(i => i.id === id);
-        if (target) saveItemsToDB([target]);
+        if (target) {
+          saveItemsToDB([target]);
+          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
+        }
         return updated;
       });
       playSFX('pop');
@@ -295,7 +378,10 @@ const App: React.FC = () => {
       setItems(prev => {
         const updated = prev.map(i => i.id === id ? { ...i, audioBase64, isRegeneratingAudio: false } : i);
         const target = updated.find(i => i.id === id);
-        if (target) saveItemsToDB([target]);
+        if (target) {
+          saveItemsToDB([target]);
+          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
+        }
         return updated;
       });
       playSFX('pop');
@@ -309,6 +395,7 @@ const App: React.FC = () => {
       deletedItemIds.current.add(id);
       setItems(prev => prev.filter(i => i.id !== id));
       await deleteItemFromDB(id);
+      if (IS_FIREBASE_ENABLED) deleteItemFromCloud(syncCode, id).catch(() => {});
       playSFX('click');
     }
   };
@@ -317,6 +404,7 @@ const App: React.FC = () => {
     if (confirm(t.deleteStoryConfirm)) {
       setStories(prev => prev.filter(s => s.id !== id));
       await deleteStoryFromDB(id);
+      if (IS_FIREBASE_ENABLED) deleteStoryFromCloud(syncCode, id).catch(() => {});
       playSFX('click');
     }
   };
@@ -383,8 +471,38 @@ const App: React.FC = () => {
     }));
     setItems(importedItems);
     saveItemsToDB(importedItems);
-    if (data.stories) setStories(data.stories);
+    if (IS_FIREBASE_ENABLED) saveItemsBatchToCloud(syncCode, importedItems).catch(() => {});
+    if (data.stories) {
+      setStories(data.stories);
+      if (IS_FIREBASE_ENABLED) {
+        (data.stories as StoryData[]).forEach(s => saveStoryToCloud(syncCode, s).catch(() => {}));
+      }
+    }
     playSFX('success');
+  };
+
+  const handleLinkCode = async (newCode: string): Promise<{ success: boolean }> => {
+    if (!IS_FIREBASE_ENABLED) return { success: false };
+    const upperCode = newCode.toUpperCase();
+    const exists = await checkSyncCodeExists(upperCode);
+    if (!exists) return { success: false };
+    const { items: cloudItems, stories: cloudStories, stats: cloudStats } = await downloadSyncData(upperCode);
+    if (cloudItems.length) {
+      setItems(cloudItems);
+      await saveItemsToDB(cloudItems);
+    }
+    if (cloudStories.length) setStories(cloudStories);
+    if (cloudStats) {
+      setStats(prev => ({
+        ...prev,
+        stars: Math.max(prev.stars || 0, cloudStats.stars || 0),
+        cardsCreated: Math.max(prev.cardsCreated || 0, cloudStats.cardsCreated || 0),
+        unlockedStickers: Array.from(new Set([...(prev.unlockedStickers || []), ...(cloudStats.unlockedStickers || [])])),
+      }));
+    }
+    setSyncCode(upperCode);
+    try { localStorage.setItem(SYNC_KEY, upperCode); } catch {}
+    return { success: true };
   };
 
   // Fix #11: Get 3 most recent unlocked stickers to show in header
@@ -442,6 +560,8 @@ const App: React.FC = () => {
           hasCustomKey={hasCustomKey}
           onExportData={handleExportData}
           onImportData={handleImportData}
+          syncCode={syncCode}
+          onLinkCode={handleLinkCode}
         />
       )}
       {showStickerBook && (
@@ -465,7 +585,10 @@ const App: React.FC = () => {
             const updated = items.map(i => i.id === itemToSave ? { ...i, isSaved: true, topic } : i);
             setItems(updated);
             const target = updated.find(i => i.id === itemToSave);
-            if (target) await saveItemsToDB([target]);
+            if (target) {
+              await saveItemsToDB([target]);
+              if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
+            }
             setItemToSave(null);
             playSFX('star');
           }}
@@ -483,7 +606,10 @@ const App: React.FC = () => {
             const updated = items.map(i => i.id === id ? { ...i, vietnameseTranslation: meaning, example: ex } : i);
             setItems(updated);
             const target = updated.find(i => i.id === id);
-            if (target) await saveItemsToDB([target]);
+            if (target) {
+              await saveItemsToDB([target]);
+              if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
+            }
             playSFX('success');
           }}
           lang={settings.language}
@@ -498,6 +624,7 @@ const App: React.FC = () => {
             const newStory = { ...story, id: story.id || 'story_' + Date.now(), userId: currentUser.id };
             await saveStoryToDB(newStory);
             setStories(prev => [newStory, ...prev]);
+            if (IS_FIREBASE_ENABLED) saveStoryToCloud(syncCode, newStory).catch(() => {});
             playSFX('success');
           }}
           isSaved={stories.some(s => s.id === activeStory.id)}
@@ -777,7 +904,10 @@ const App: React.FC = () => {
                         const updated = items.map(i => i.id === id ? { ...i, isSaved: false } : i);
                         setItems(updated);
                         const target = updated.find(i => i.id === id);
-                        if (target) saveItemsToDB([target]);
+                        if (target) {
+                          saveItemsToDB([target]);
+                          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
+                        }
                         playSFX('click');
                       }}
                       onRegenerateImage={regenerateImage}

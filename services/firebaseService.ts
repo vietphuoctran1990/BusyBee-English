@@ -1,105 +1,165 @@
+import { initializeApp } from 'firebase/app';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  collection,
+  query,
+  orderBy,
+  getDoc,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore';
+import { FIREBASE_CONFIG, IS_FIREBASE_ENABLED } from '../config';
+import { LearningItem, StoryData, UserStats } from '../types';
 
-import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut, 
-  onAuthStateChanged,
-  User
-} from "firebase/auth";
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  collection, 
-  query, 
-  orderBy, 
-  enableIndexedDbPersistence 
-} from "firebase/firestore";
-import { FIREBASE_CONFIG } from "../config";
-import { LearningItem, StoryData, UserStats } from "../types";
+// ── Init ───────────────────────────────────────────────────────────────────
+let db: ReturnType<typeof initializeFirestore> | null = null;
 
-// Initialize Firebase
-const app = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(app);
-const db = getFirestore(app);
+if (IS_FIREBASE_ENABLED) {
+  try {
+    const app = initializeApp(FIREBASE_CONFIG);
+    // Firebase 10+ offline persistence API
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch (e) {
+    console.warn('[Firebase] Init failed:', e);
+  }
+}
 
-// Enable Offline Persistence (Best for mobile/kids)
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");
-    } else if (err.code === 'unimplemented') {
-      console.warn("The current browser doesn't support all of the features necessary to enable persistence");
-    }
-  });
-} catch (e) {}
+// ── Sync-code helpers ──────────────────────────────────────────────────────
 
-const googleProvider = new GoogleAuthProvider();
-
-export const loginWithGoogle = async () => {
-  const result = await signInWithPopup(auth, googleProvider);
-  return result.user;
+/** Generate a 6-char alphanumeric sync code */
+export const generateSyncCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
-export const logout = () => signOut(auth);
-
-export const subscribeToAuth = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, callback);
+/** Check whether a sync code has data in Firestore */
+export const checkSyncCodeExists = async (code: string): Promise<boolean> => {
+  if (!db) return false;
+  try {
+    const snap = await getDocs(collection(db, 'users', code.toUpperCase(), 'items'));
+    return !snap.empty;
+  } catch { return false; }
 };
 
-// --- DATA SYNC ---
-
-export const saveItemToCloud = async (userId: string, item: LearningItem) => {
-  const docRef = doc(db, "users", userId, "items", item.id);
-  await setDoc(docRef, { ...item, updatedAt: Date.now() }, { merge: true });
+/** Download all data for a sync code — returns { items, stories, stats } */
+export const downloadSyncData = async (code: string): Promise<{
+  items: LearningItem[];
+  stories: StoryData[];
+  stats: UserStats | null;
+}> => {
+  if (!db) return { items: [], stories: [], stats: null };
+  const uid = code.toUpperCase();
+  try {
+    const [itemsSnap, storiesSnap, statsSnap] = await Promise.all([
+      getDocs(query(collection(db, 'users', uid, 'items'), orderBy('createdAt', 'desc'))),
+      getDocs(query(collection(db, 'users', uid, 'stories'), orderBy('createdAt', 'desc'))),
+      getDoc(doc(db, 'users', uid, 'profile', 'stats')),
+    ]);
+    return {
+      items: itemsSnap.docs.map(d => d.data() as LearningItem),
+      stories: storiesSnap.docs.map(d => d.data() as StoryData),
+      stats: statsSnap.exists() ? (statsSnap.data() as UserStats) : null,
+    };
+  } catch (e) {
+    console.warn('[Firebase] downloadSyncData failed:', e);
+    return { items: [], stories: [], stats: null };
+  }
 };
 
-export const deleteItemFromCloud = async (userId: string, itemId: string) => {
-  const docRef = doc(db, "users", userId, "items", itemId);
-  await deleteDoc(docRef);
+// ── Items ──────────────────────────────────────────────────────────────────
+
+export const saveItemToCloud = async (syncCode: string, item: LearningItem): Promise<void> => {
+  if (!db) return;
+  try {
+    const ref = doc(db, 'users', syncCode, 'items', item.id);
+    // Strip non-serialisable / transient fields before saving
+    const { loading, isRegeneratingImage, isRegeneratingAudio, error, ...clean } = item as any;
+    await setDoc(ref, { ...clean, updatedAt: Date.now() }, { merge: true });
+  } catch (e) { console.warn('[Firebase] saveItemToCloud:', e); }
 };
 
-export const subscribeToItems = (userId: string, callback: (items: LearningItem[]) => void) => {
-  const q = query(collection(db, "users", userId, "items"), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs.map(doc => doc.data() as LearningItem);
-    callback(items);
-  });
+export const saveItemsBatchToCloud = async (syncCode: string, items: LearningItem[]): Promise<void> => {
+  if (!db || !items.length) return;
+  try {
+    const batch = writeBatch(db);
+    items.forEach(item => {
+      const { loading, isRegeneratingImage, isRegeneratingAudio, error, ...clean } = item as any;
+      batch.set(doc(db!, 'users', syncCode, 'items', item.id), { ...clean, updatedAt: Date.now() }, { merge: true });
+    });
+    await batch.commit();
+  } catch (e) { console.warn('[Firebase] saveItemsBatch:', e); }
 };
 
-export const saveStoryToCloud = async (userId: string, story: StoryData) => {
-  if (!story.id) story.id = Date.now().toString();
-  const docRef = doc(db, "users", userId, "stories", story.id);
-  await setDoc(docRef, { ...story, updatedAt: Date.now() }, { merge: true });
+export const deleteItemFromCloud = async (syncCode: string, itemId: string): Promise<void> => {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'users', syncCode, 'items', itemId));
+  } catch (e) { console.warn('[Firebase] deleteItemFromCloud:', e); }
 };
 
-export const deleteStoryFromCloud = async (userId: string, storyId: string) => {
-  const docRef = doc(db, "users", userId, "stories", storyId);
-  await deleteDoc(docRef);
+export const subscribeToItems = (
+  syncCode: string,
+  callback: (items: LearningItem[]) => void,
+): () => void => {
+  if (!db) return () => {};
+  const q = query(collection(db, 'users', syncCode, 'items'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => d.data() as LearningItem));
+  }, err => console.warn('[Firebase] subscribeToItems:', err));
 };
 
-export const subscribeToStories = (userId: string, callback: (stories: StoryData[]) => void) => {
-  const q = query(collection(db, "users", userId, "stories"), orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snapshot) => {
-    const stories = snapshot.docs.map(doc => doc.data() as StoryData);
-    callback(stories);
-  });
+// ── Stories ────────────────────────────────────────────────────────────────
+
+export const saveStoryToCloud = async (syncCode: string, story: StoryData): Promise<void> => {
+  if (!db || !story.id) return;
+  try {
+    await setDoc(doc(db, 'users', syncCode, 'stories', story.id), { ...story, updatedAt: Date.now() }, { merge: true });
+  } catch (e) { console.warn('[Firebase] saveStoryToCloud:', e); }
 };
 
-export const saveStatsToCloud = async (userId: string, stats: UserStats) => {
-  const docRef = doc(db, "users", userId, "profile", "stats");
-  await setDoc(docRef, { ...stats, updatedAt: Date.now() }, { merge: true });
+export const deleteStoryFromCloud = async (syncCode: string, storyId: string): Promise<void> => {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'users', syncCode, 'stories', storyId));
+  } catch (e) { console.warn('[Firebase] deleteStoryFromCloud:', e); }
 };
 
-export const subscribeToStats = (userId: string, callback: (stats: UserStats) => void) => {
-  const docRef = doc(db, "users", userId, "profile", "stats");
-  return onSnapshot(docRef, (doc) => {
-    if (doc.exists()) {
-      callback(doc.data() as UserStats);
-    }
-  });
+export const subscribeToStories = (
+  syncCode: string,
+  callback: (stories: StoryData[]) => void,
+): () => void => {
+  if (!db) return () => {};
+  const q = query(collection(db, 'users', syncCode, 'stories'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => d.data() as StoryData));
+  }, err => console.warn('[Firebase] subscribeToStories:', err));
+};
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+
+export const saveStatsToCloud = async (syncCode: string, stats: UserStats): Promise<void> => {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'users', syncCode, 'profile', 'stats'), { ...stats, updatedAt: Date.now() }, { merge: true });
+  } catch (e) { console.warn('[Firebase] saveStatsToCloud:', e); }
+};
+
+export const subscribeToStats = (
+  syncCode: string,
+  callback: (stats: UserStats) => void,
+): () => void => {
+  if (!db) return () => {};
+  return onSnapshot(doc(db, 'users', syncCode, 'profile', 'stats'), snap => {
+    if (snap.exists()) callback(snap.data() as UserStats);
+  }, err => console.warn('[Firebase] subscribeToStats:', err));
 };
