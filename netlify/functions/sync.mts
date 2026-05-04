@@ -7,37 +7,42 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
   const url = new URL(req.url);
   const code = url.searchParams.get('code')?.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  if (!code || code.length !== 6) {
-    return new Response(JSON.stringify({ error: 'Invalid code' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  if (!code || code.length !== 6) return json({ error: 'invalid_code' }, 400);
+
+  let store: ReturnType<typeof getStore>;
+  try {
+    // No consistency option — works on all Netlify plans (including free)
+    store = getStore('busybee-sync');
+  } catch (e) {
+    return json({ error: 'store_init_failed', detail: String(e) }, 500);
   }
 
-  const store = getStore({ name: 'busybee-sync', consistency: 'strong' });
-
-  // GET — download sync data
   if (req.method === 'GET') {
     try {
       const data = await store.get(code, { type: 'json' });
-      if (!data) return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...CORS, 'Content-Type': 'application/json' } });
-      return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } });
-    } catch {
-      return new Response(JSON.stringify({ error: 'server_error' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } });
+      if (!data) return json({ error: 'not_found' }, 404);
+      return json(data);
+    } catch (e) {
+      return json({ error: 'get_failed', detail: String(e) }, 500);
     }
   }
 
-  // POST — upload sync data
   if (req.method === 'POST') {
     try {
       const body = await req.json();
       await store.setJSON(code, { ...body, updatedAt: Date.now() });
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } });
-    } catch {
-      return new Response(JSON.stringify({ error: 'server_error' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } });
+      return json({ ok: true });
+    } catch (e) {
+      return json({ error: 'post_failed', detail: String(e) }, 500);
     }
   }
 

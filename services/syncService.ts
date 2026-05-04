@@ -15,8 +15,11 @@ export const checkCodeExists = async (code: string): Promise<'found' | 'not_foun
     const res = await fetch(`${BASE}?code=${code.toUpperCase()}`, { method: 'GET' });
     if (res.status === 404) return 'not_found';
     if (res.ok) return 'found';
+    const body = await res.text().catch(() => '');
+    console.warn('[Sync] checkCodeExists error:', res.status, body);
     return 'error';
-  } catch {
+  } catch (e) {
+    console.warn('[Sync] checkCodeExists fetch failed:', e);
     return 'error';
   }
 };
@@ -25,9 +28,15 @@ export const checkCodeExists = async (code: string): Promise<'found' | 'not_foun
 export const downloadData = async (code: string): Promise<SyncData> => {
   try {
     const res = await fetch(`${BASE}?code=${code.toUpperCase()}`);
-    if (!res.ok) return { items: [], stories: [], stats: null };
+    if (res.status === 404) return { items: [], stories: [], stats: null };
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.warn('[Sync] downloadData error:', res.status, body);
+      return { items: [], stories: [], stats: null };
+    }
     return await res.json() as SyncData;
-  } catch {
+  } catch (e) {
+    console.warn('[Sync] downloadData fetch failed:', e);
     return { items: [], stories: [], stats: null };
   }
 };
@@ -40,8 +49,13 @@ export const uploadData = async (code: string, data: SyncData): Promise<boolean>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.warn('[Sync] uploadData error:', res.status, body);
+    }
     return res.ok;
-  } catch {
+  } catch (e) {
+    console.warn('[Sync] uploadData fetch failed:', e);
     return false;
   }
 };
