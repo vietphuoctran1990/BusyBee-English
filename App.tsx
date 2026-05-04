@@ -132,13 +132,22 @@ const App: React.FC = () => {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
 
-  // Load local data on startup (fast, from IndexedDB cache)
+  // Load local data on startup then push to Firebase (first-time sync)
   useEffect(() => {
-    if (currentUser) {
-      loadItemsFromDB(currentUser.id).then(setItems);
-      loadStoriesFromDB(currentUser.id).then(setStories);
-    }
-  }, [currentUser]);
+    if (!currentUser) return;
+    loadItemsFromDB(currentUser.id).then(localItems => {
+      setItems(localItems);
+      if (IS_FIREBASE_ENABLED && localItems.length > 0) {
+        saveItemsBatchToCloud(syncCode, localItems).catch(() => {});
+      }
+    });
+    loadStoriesFromDB(currentUser.id).then(localStories => {
+      setStories(localStories);
+      if (IS_FIREBASE_ENABLED && localStories.length > 0) {
+        localStories.forEach(s => saveStoryToCloud(syncCode, s).catch(() => {}));
+      }
+    });
+  }, [currentUser]); // eslint-disable-line
 
   // Firebase realtime sync — subscribes once user is logged in
   useEffect(() => {

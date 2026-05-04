@@ -42,12 +42,16 @@ export const generateSyncCode = (): string => {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
-/** Check whether a sync code has data in Firestore */
+/** Check whether a sync code has data in Firestore — checks items OR stats */
 export const checkSyncCodeExists = async (code: string): Promise<boolean> => {
   if (!db) return false;
   try {
-    const snap = await getDocs(collection(db, 'users', code.toUpperCase(), 'items'));
-    return !snap.empty;
+    const uid = code.toUpperCase();
+    const [itemsSnap, statsSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'items')),
+      getDoc(doc(db, 'users', uid, 'profile', 'stats')),
+    ]);
+    return !itemsSnap.empty || statsSnap.exists();
   } catch { return false; }
 };
 
