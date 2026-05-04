@@ -46,7 +46,7 @@ const StickerBookModal: React.FC<StickerBookModalProps> = ({ stars, unlockedStic
 
         {/* Sticker Grid */}
         <div className="flex-1 overflow-y-auto p-6 bg-yellow-50 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                 {stickers.map(sticker => {
                     const isUnlocked = unlockedStickers.includes(sticker.id);
                     const canAfford = stars >= sticker.cost;
@@ -92,37 +92,37 @@ const StickerBookModal: React.FC<StickerBookModalProps> = ({ stars, unlockedStic
 
         {/* --- ZOOMED POKEMON OVERLAY --- */}
         {viewingSticker && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in" onClick={() => setViewingSticker(null)}>
-                <div 
-                    className={`relative w-full max-w-md aspect-square rounded-full flex items-center justify-center p-8 animate-bounce-in shadow-[0_0_50px_rgba(255,255,255,0.5)] ${viewingSticker.bg} border-8 border-white`}
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in safe-inset" onClick={() => setViewingSticker(null)}>
+                <div
+                    className={`relative w-full max-w-[min(340px,80vw)] aspect-square rounded-full flex items-center justify-center animate-scale-up shadow-[0_0_50px_rgba(255,255,255,0.5)] ${viewingSticker.bg} border-4 md:border-8 border-white mb-8`}
                     onClick={e => e.stopPropagation()}
                 >
-                    {/* Background Burst Effect */}
-                    <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.8)_0%,transparent_70%)] opacity-50"></div>
-                    <div className="absolute inset-0 rounded-full border-[20px] border-white/20 animate-pulse"></div>
+                    {/* Background Burst */}
+                    <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.8)_0%,transparent_70%)] opacity-50" />
+                    <div className="absolute inset-0 rounded-full border-8 md:border-[16px] border-white/20 animate-pulse" />
 
                     {/* Sparkles */}
-                    <SparklesIcon className="absolute top-10 left-10 w-12 h-12 text-white animate-spin-slow opacity-80" />
-                    <SparklesIcon className="absolute bottom-10 right-10 w-8 h-8 text-yellow-200 animate-bounce opacity-80" />
-                    
-                    {/* The Pokemon */}
-                    <img 
-                        src={viewingSticker.imageUrl} 
-                        className="w-[120%] h-[120%] object-contain drop-shadow-2xl z-10 transition-transform hover:scale-110" 
-                        alt={viewingSticker.name} 
+                    <SparklesIcon className="absolute top-6 left-6 w-8 h-8 md:w-10 md:h-10 text-white opacity-80" />
+                    <SparklesIcon className="absolute bottom-6 right-6 w-6 h-6 md:w-8 md:h-8 text-yellow-200 animate-bounce opacity-80" />
+
+                    {/* Pokemon image */}
+                    <img
+                        src={viewingSticker.imageUrl}
+                        className="w-4/5 h-4/5 object-contain drop-shadow-2xl z-10 transition-transform hover:scale-110"
+                        alt={viewingSticker.name}
                     />
-                    
-                    {/* Name Badge */}
-                    <div className="absolute -bottom-6 bg-white px-8 py-2 rounded-full shadow-xl border-4 border-indigo-100 flex flex-col items-center transform hover:scale-110 transition-transform cursor-default">
-                        <h3 className="text-3xl font-black text-indigo-900 uppercase tracking-widest">{viewingSticker.name}</h3>
+
+                    {/* Name Badge — positioned inside circle to avoid clip */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-lg border-2 border-indigo-100">
+                        <h3 className="text-lg md:text-2xl font-black text-indigo-900 uppercase tracking-widest whitespace-nowrap">{viewingSticker.name}</h3>
                     </div>
 
                     {/* Close Button */}
-                    <button 
+                    <button
                         onClick={() => setViewingSticker(null)}
-                        className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 p-3 rounded-full shadow-lg border-4 border-gray-100 transition-colors z-20"
+                        className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 p-2.5 rounded-full shadow-lg border-2 border-gray-100 transition-colors z-20 min-h-[44px] min-w-[44px] flex items-center justify-center"
                     >
-                        <XMarkIcon className="w-8 h-8" />
+                        <XMarkIcon className="w-6 h-6" />
                     </button>
                 </div>
             </div>

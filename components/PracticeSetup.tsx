@@ -93,7 +93,7 @@ const PracticeSetup: React.FC<PracticeSetupProps> = ({ savedItems, onStartGame, 
         <p className="text-blue-500 font-medium">{t.chooseGame}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-3 mb-8">
         <GameOption 
           type="listening" 
           icon={SpeakerWaveIcon} 
@@ -153,23 +153,24 @@ const PracticeSetup: React.FC<PracticeSetupProps> = ({ savedItems, onStartGame, 
           </button>
         </div>
         
-        <div className="max-h-60 overflow-y-auto p-2 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-blue-50/50">
+        <div className="max-h-64 overflow-y-auto p-2 grid grid-cols-1 min-[480px]:grid-cols-2 gap-2 bg-blue-50/50">
           {visibleItems.length === 0 ? (
              <div className="col-span-full py-8 text-center text-gray-400 font-medium">{t.noSaved}</div>
           ) : (
             visibleItems.map(item => (
-                <div key={item.id} onClick={() => toggleSelection(item.id)} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer border-2 transition-all bg-white ${selectedIds.has(item.id) ? 'border-blue-400 bg-blue-50' : 'border-transparent hover:border-blue-100 shadow-sm'}`}>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedIds.has(item.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
-                        {selectedIds.has(item.id) && <CheckCircleIcon className="w-4 h-4 text-white" />}
+                <div key={item.id} onClick={() => toggleSelection(item.id)} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all bg-white min-h-[56px] ${selectedIds.has(item.id) ? 'border-blue-400 bg-blue-50' : 'border-transparent hover:border-blue-100 shadow-sm'}`}>
+                    {/* Checkbox — min 44px touch area */}
+                    <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedIds.has(item.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                        {selectedIds.has(item.id) && <CheckCircleIcon className="w-5 h-5 text-white" />}
                     </div>
                     {item.imageUrl ? (
-                        <img src={`data:image/jpeg;base64,${item.imageUrl}`} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                    ) : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-xs">🖼️</div>}
-                    <div className="flex-1">
-                        <span className="font-bold text-gray-700 block">{item.text}</span>
-                        <div className="flex gap-0.5 mt-0.5">
+                        <img src={`data:image/jpeg;base64,${item.imageUrl}`} className="w-10 h-10 rounded-lg object-cover shrink-0" alt="" />
+                    ) : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-base shrink-0">🖼️</div>}
+                    <div className="flex-1 min-w-0">
+                        <span className="font-bold text-gray-700 block truncate text-sm">{item.text}</span>
+                        <div className="flex gap-1 mt-1">
                            {[20, 50, 80].map(v => (
-                               <div key={v} className={`w-2 h-2 rounded-full ${(item.proficiency || 0) >= v ? 'bg-blue-400' : 'bg-gray-200'}`}></div>
+                               <div key={v} className={`w-2.5 h-2.5 rounded-full ${(item.proficiency || 0) >= v ? 'bg-blue-400' : 'bg-gray-200'}`} />
                            ))}
                         </div>
                     </div>

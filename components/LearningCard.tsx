@@ -51,49 +51,49 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
 
   return (
     <div
-      className="clay-card p-4 md:p-5 group relative transform transition-all hover:scale-[1.02] active:scale-[0.98] animate-scale-up h-full flex flex-col min-h-[340px] md:min-h-[400px] cursor-pointer"
+      className="clay-card p-3 sm:p-4 md:p-5 group relative transform transition-all hover:scale-[1.02] active:scale-[0.98] animate-scale-up h-full flex flex-col min-h-[300px] sm:min-h-[340px] md:min-h-[380px] cursor-pointer"
       onClick={() => !item.error && !item.loading && setShowDetails(!showDetails)}
     >
-      {/* Action Buttons */}
-      <div className="absolute top-3 right-3 md:top-5 md:right-5 z-30 flex flex-col gap-2">
+      {/* Action Buttons — min 44px touch targets */}
+      <div className="absolute top-2 right-2 md:top-4 md:right-4 z-30 flex flex-col gap-1.5">
         {!item.loading && !item.error && (
           <>
             <button
               onClick={toggleTranslate}
-              className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg transition-all border-2 ${showDetails ? 'bg-orange-500 text-white border-orange-400' : 'bg-white/90 text-orange-500 border-orange-50'}`}
+              className={`p-2.5 rounded-xl shadow-lg transition-all border-2 min-h-[44px] min-w-[44px] flex items-center justify-center ${showDetails ? 'bg-orange-500 text-white border-orange-400' : 'bg-white/95 text-orange-500 border-orange-100'}`}
               title={t.vnMeaning}
             >
-              <LanguageIcon className="w-4 h-4 md:w-5 md:h-5" />
+              <LanguageIcon className="w-5 h-5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(item.id); }}
-              className="p-2 md:p-2.5 bg-white/90 rounded-xl md:rounded-2xl text-blue-500 hover:scale-110 shadow-lg transition-all border-2 border-blue-50"
+              className="p-2.5 bg-white/95 rounded-xl text-blue-500 hover:scale-110 shadow-lg transition-all border-2 border-blue-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
-              <PencilSquareIcon className="w-4 h-4 md:w-5 md:h-5" />
+              <PencilSquareIcon className="w-5 h-5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onRegenerateImage(item.id); }}
               disabled={item.isRegeneratingImage}
-              className="p-2 md:p-2.5 bg-white/90 rounded-xl md:rounded-2xl text-purple-500 hover:scale-110 shadow-lg transition-all border-2 border-purple-50 disabled:opacity-40"
+              className="p-2.5 bg-white/95 rounded-xl text-purple-500 hover:scale-110 shadow-lg transition-all border-2 border-purple-100 disabled:opacity-40 min-h-[44px] min-w-[44px] flex items-center justify-center"
               title={t.regenerateImg}
             >
               {item.isRegeneratingImage
-                ? <ArrowPathIcon className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                : <PhotoIcon className="w-4 h-4 md:w-5 md:h-5" />}
+                ? <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                : <PhotoIcon className="w-5 h-5" />}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSave(item.id); }}
-              className={`p-2 md:p-2.5 rounded-xl md:rounded-2xl shadow-lg transition-all border-2 ${item.isSaved ? 'bg-pink-500 text-white border-pink-400' : 'bg-white/90 text-pink-400 border-pink-50'}`}
+              className={`p-2.5 rounded-xl shadow-lg transition-all border-2 min-h-[44px] min-w-[44px] flex items-center justify-center ${item.isSaved ? 'bg-pink-500 text-white border-pink-400' : 'bg-white/95 text-pink-400 border-pink-100'}`}
             >
-              {item.isSaved ? <HeartIconSolid className="w-4 h-4 md:w-5 md:h-5" /> : <HeartIconOutline className="w-4 h-4 md:w-5 md:h-5" />}
+              {item.isSaved ? <HeartIconSolid className="w-5 h-5" /> : <HeartIconOutline className="w-5 h-5" />}
             </button>
           </>
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-          className="p-2 md:p-2.5 bg-white/90 rounded-xl md:rounded-2xl text-gray-400 hover:text-red-500 shadow-lg transition-all border-2 border-gray-50"
+          className="p-2.5 bg-white/95 rounded-xl text-gray-400 hover:text-red-500 shadow-lg transition-all border-2 border-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
-          <TrashIcon className="w-4 h-4 md:w-5 md:h-5" />
+          <TrashIcon className="w-5 h-5" />
         </button>
       </div>
 

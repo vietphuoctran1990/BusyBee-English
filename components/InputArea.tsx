@@ -61,39 +61,41 @@ const InputArea: React.FC<InputAreaProps> = ({ onAdd, disabled, lang }) => {
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
-            <div className="flex-1 flex flex-wrap gap-2 md:gap-4">
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
                 <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
-                
-                <button 
-                  type="button" 
-                  onClick={() => fileInputRef.current?.click()} 
-                  className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl md:rounded-3xl font-black text-sm md:text-lg flex items-center gap-2 transition-all border-2 md:border-4 ${selectedImage && !isDrawingMode ? 'bg-green-500 text-white border-green-400 shadow-lg' : 'bg-white text-blue-500 border-blue-50 hover:bg-blue-50'}`}
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex-1 min-w-[130px] px-3 py-3 md:px-5 md:py-3.5 rounded-2xl font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all border-2 min-h-[48px] ${selectedImage && !isDrawingMode ? 'bg-green-500 text-white border-green-400 shadow-lg' : 'bg-white text-blue-500 border-blue-100 hover:bg-blue-50'}`}
                 >
-                    {selectedImage && !isDrawingMode ? <CheckIcon className="w-5 h-5 md:w-6 md:h-6" /> : <PhotoIcon className="w-5 h-5 md:w-6 md:h-6" />}
-                    <span>{selectedImage && !isDrawingMode ? t.imageAdded : t.addRefImage}</span>
+                    {selectedImage && !isDrawingMode ? <CheckIcon className="w-5 h-5 shrink-0" /> : <PhotoIcon className="w-5 h-5 shrink-0" />}
+                    <span className="truncate">{selectedImage && !isDrawingMode ? t.imageAdded : t.addRefImage}</span>
                 </button>
 
-                <button 
-                  type="button" 
-                  onClick={() => setIsDrawingMode(!isDrawingMode)} 
-                  className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl md:rounded-3xl font-black text-sm md:text-lg flex items-center gap-2 transition-all border-2 md:border-4 ${isDrawingMode ? 'bg-pink-500 text-white border-pink-400 shadow-lg' : 'bg-white text-pink-500 border-pink-50 hover:bg-pink-50'}`}
+                <button
+                  type="button"
+                  onClick={() => setIsDrawingMode(!isDrawingMode)}
+                  className={`flex-1 min-w-[120px] px-3 py-3 md:px-5 md:py-3.5 rounded-2xl font-black text-sm md:text-base flex items-center justify-center gap-2 transition-all border-2 min-h-[48px] ${isDrawingMode ? 'bg-pink-500 text-white border-pink-400 shadow-lg' : 'bg-white text-pink-500 border-pink-100 hover:bg-pink-50'}`}
                 >
-                    <PaintBrushIcon className="w-5 h-5 md:w-6 md:h-6" />
-                    <span>{isDrawingMode ? t.clearDrawing : t.drawIt}</span>
+                    <PaintBrushIcon className="w-5 h-5 shrink-0" />
+                    <span className="truncate">{isDrawingMode ? t.clearDrawing : t.drawIt}</span>
                 </button>
 
                 {selectedImage && (
-                    <button type="button" onClick={() => { setSelectedImage(null); setIsDrawingMode(false); }} className="p-3 md:p-4 bg-red-50 text-red-500 rounded-2xl border-2 border-red-100 hover:bg-red-100"><XMarkIcon className="w-5 h-5 md:w-6 md:h-6"/></button>
+                    <button type="button" onClick={() => { setSelectedImage(null); setIsDrawingMode(false); }} className="p-3 bg-red-50 text-red-500 rounded-2xl border-2 border-red-100 hover:bg-red-100 min-h-[48px] min-w-[48px] flex items-center justify-center">
+                      <XMarkIcon className="w-5 h-5" />
+                    </button>
                 )}
             </div>
 
-            <button 
-              type="submit" 
-              disabled={disabled || !text.trim()} 
-              className="w-full lg:w-auto px-10 py-4 md:py-6 clay-button clay-blue text-white font-black text-xl md:text-2xl shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+            <button
+              type="submit"
+              disabled={disabled || !text.trim()}
+              className="w-full py-4 md:py-5 clay-button clay-blue text-white font-black text-xl md:text-2xl shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale transition-all active:scale-95 min-h-[56px]"
             >
-                <PlusIcon className="w-6 h-6 md:w-8 md:h-8" /> <span>{t.createCards}</span>
+                <PlusIcon className="w-6 h-6 md:w-7 md:h-7" /> <span>{t.createCards}</span>
             </button>
         </div>
 

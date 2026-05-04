@@ -50,7 +50,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-sky-50 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-sky-50 flex items-center justify-center p-4 relative overflow-hidden safe-inset">
         {/* Background blobs */}
         <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-pink-200/30 rounded-full blur-[80px] md:blur-[150px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-blue-200/30 rounded-full blur-[80px] md:blur-[150px] animate-pulse"></div>
@@ -103,12 +103,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                     <label className="flex items-center gap-2 text-xs md:text-sm font-black text-blue-400 uppercase tracking-widest ml-4">
                         <FaceSmileIcon className="w-4 h-4"/> Chọn hình đại diện
                     </label>
-                    <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-3 md:p-4 clay-input bg-white/50 max-h-32 overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 gap-2 p-3 md:p-4 clay-input bg-white/50 max-h-36 overflow-y-auto no-scrollbar">
                         {AVATARS.map(a => (
-                            <button 
-                                key={a} 
-                                onClick={() => { setAvatar(a); playSFX('click'); }} 
-                                className={`text-2xl md:text-3xl p-2 rounded-xl transition-all ${avatar === a ? 'bg-white shadow-lg ring-2 ring-blue-300 scale-110' : 'opacity-40 hover:opacity-100'}`}
+                            <button
+                                key={a}
+                                onClick={() => { setAvatar(a); playSFX('click'); }}
+                                className={`text-2xl md:text-3xl p-2 rounded-xl transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${avatar === a ? 'bg-white shadow-lg ring-2 ring-blue-300 scale-110' : 'opacity-40 hover:opacity-100'}`}
                             >
                                 {a}
                             </button>

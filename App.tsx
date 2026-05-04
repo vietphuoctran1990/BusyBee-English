@@ -428,7 +428,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#F0F9FF] pb-32 lg:pb-12">
+    <div className="min-h-screen bg-[#F0F9FF] pb-32 lg:pb-12" style={{ paddingBottom: 'max(128px, calc(128px + env(safe-area-inset-bottom)))' }}>
       {showIntroModal && <IntroModal onClose={() => setShowIntroModal(false)} lang={settings.language} />}
       {showSettings && (
         <SettingsModal
@@ -533,7 +533,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="max-w-[1440px] mx-auto px-4 md:px-10 lg:px-16 pt-4 md:pt-10">
+      <div className="max-w-[1440px] mx-auto px-4 md:px-10 lg:px-16 pt-4 md:pt-10 px-safe">
         <header className="flex flex-col md:flex-row items-center justify-between mb-8 md:mb-12 gap-4 md:gap-8">
           {/* User Card with streak + stickers (#4, #5, #11) */}
           <div className="clay-card w-full md:w-auto px-6 py-3 md:px-10 md:py-6 flex items-center justify-between md:justify-start gap-4 md:gap-8 shadow-xl border-white hover:scale-[1.01] transition-all">
@@ -543,26 +543,26 @@ const App: React.FC = () => {
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl md:text-4xl font-black text-blue-900 leading-tight truncate">{currentUser.name}</h1>
-                <div className="flex items-center flex-wrap gap-2 mt-1">
+                <div className="flex items-center flex-wrap gap-1.5 mt-1">
                   {/* Stars */}
-                  <div onClick={() => { setShowStickerBook(true); playSFX('click'); }} className="flex items-center gap-1.5 bg-yellow-400 px-3 py-1 md:px-5 md:py-2 rounded-full text-white font-black text-[10px] md:text-lg cursor-pointer hover:bg-yellow-500 transition-all shadow-md">
-                    <StarIcon className="w-3.5 h-3.5 md:w-5 md:h-5" /> {stats.stars}
+                  <div onClick={() => { setShowStickerBook(true); playSFX('click'); }} className="flex items-center gap-1 bg-yellow-400 px-2.5 py-1 md:px-4 md:py-1.5 rounded-full text-white font-black text-[11px] md:text-sm cursor-pointer hover:bg-yellow-500 transition-all shadow-md">
+                    <StarIcon className="w-3 h-3 md:w-4 md:h-4" /> {stats.stars}
                   </div>
-                  {/* Fix #5: Streak badge */}
+                  {/* Streak badge */}
                   {(stats.streak || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-orange-400 px-3 py-1 md:px-5 md:py-2 rounded-full text-white font-black text-[10px] md:text-lg shadow-md">
-                      <FireIcon className="w-3.5 h-3.5 md:w-5 md:h-5" /> {stats.streak}
+                    <div className="flex items-center gap-1 bg-orange-400 px-2.5 py-1 md:px-4 md:py-1.5 rounded-full text-white font-black text-[11px] md:text-sm shadow-md">
+                      <FireIcon className="w-3 h-3 md:w-4 md:h-4" /> {stats.streak}
                     </div>
                   )}
-                  {/* Fix #4: Cards created badge */}
+                  {/* Cards created badge */}
                   {(stats.cardsCreated || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-blue-100 px-3 py-1 md:px-4 md:py-1.5 rounded-full text-blue-600 font-black text-[10px] md:text-sm shadow-sm">
-                      <ChartBarIcon className="w-3 h-3 md:w-4 md:h-4" /> {stats.cardsCreated}
+                    <div className="flex items-center gap-1 bg-blue-100 px-2.5 py-1 md:px-3 md:py-1 rounded-full text-blue-600 font-black text-[11px] md:text-xs shadow-sm">
+                      <ChartBarIcon className="w-3 h-3 md:w-3.5 md:h-3.5" /> {stats.cardsCreated}
                     </div>
                   )}
                   {hasCustomKey && (
-                    <div className="bg-indigo-500 text-white px-2 py-0.5 md:px-4 md:py-1.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm shrink-0">
-                      <KeyIcon className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" /> PRO
+                    <div className="bg-indigo-500 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm shrink-0">
+                      <KeyIcon className="w-2.5 h-2.5 md:w-3 md:h-3" /> PRO
                     </div>
                   )}
                 </div>
@@ -605,9 +605,9 @@ const App: React.FC = () => {
           </nav>
         </header>
 
-        {/* Mobile Nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-2 bg-gradient-to-t from-sky-200/60 via-sky-100/40 to-transparent pointer-events-none">
-          <div className="bg-white/95 backdrop-blur-2xl p-1.5 rounded-[2.5rem] shadow-[0_-8px_20px_rgba(0,0,0,0.06)] border-[3px] border-white flex justify-between items-center pointer-events-auto max-w-lg mx-auto">
+        {/* Mobile Nav — pb-safe ensures clearance from home indicator */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pt-2 pb-safe bg-gradient-to-t from-sky-200/60 via-sky-100/40 to-transparent pointer-events-none" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+          <div className="bg-white/95 backdrop-blur-2xl p-1.5 rounded-[2.5rem] shadow-[0_-8px_20px_rgba(0,0,0,0.06)] border-[3px] border-white flex justify-between items-center pointer-events-auto max-w-lg mx-auto mb-2">
             {[
               { id: 'create', icon: HomeIcon, label: t.home },
               { id: 'saved', icon: HeartIcon, label: t.saved },
@@ -618,10 +618,10 @@ const App: React.FC = () => {
               <button
                 key={item.id}
                 onClick={() => { setView(item.id as any); playSFX('click'); setIsSelectingForStory(false); }}
-                className={`flex-1 flex flex-col items-center gap-1 px-2 py-3 rounded-[2rem] transition-all duration-300 ${view === item.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}
+                className={`flex-1 flex flex-col items-center gap-1 px-2 py-3 rounded-[2rem] transition-all duration-300 min-h-[56px] ${view === item.id ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}
               >
                 <item.icon className="w-5 h-5" />
-                <span className="text-[8px] font-black tracking-wider uppercase">{item.label}</span>
+                <span className="text-[9px] font-black tracking-wider uppercase">{item.label}</span>
               </button>
             ))}
           </div>
@@ -674,7 +674,7 @@ const App: React.FC = () => {
                     <p className="text-xl font-black text-blue-300">{t.noMatches}</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-10">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6 lg:gap-8">
                     {filteredItems.map(item => (
                       <LearningCard
                         key={item.id}
