@@ -115,6 +115,8 @@ const App: React.FC = () => {
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCloudTsRef = useRef<number>(0);
+  const lastPushTsRef = useRef<number>(0);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
@@ -126,7 +128,31 @@ const App: React.FC = () => {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
 
-  // On login: load local IndexedDB, then pull cloud data and merge
+  // Apply cloud snapshot to local state (shared by initial load + polling)
+  const applyCloudData = useCallback((cloud: Awaited<ReturnType<typeof downloadData>>) => {
+    if (!cloud.updatedAt) return;
+    lastCloudTsRef.current = cloud.updatedAt;
+    if (cloud.items.length) {
+      setItems(cloud.items);
+      saveItemsToDB(cloud.items).catch(() => {});
+    }
+    if (cloud.stories.length) setStories(cloud.stories);
+    if (cloud.stats) {
+      setStats(prev => ({
+        ...prev,
+        stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
+        cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
+        streak: cloud.stats!.streak || prev.streak || 0,
+        lastLoginDate: cloud.stats!.lastLoginDate || prev.lastLoginDate || '',
+        unlockedStickers: Array.from(new Set([
+          ...(prev.unlockedStickers || []),
+          ...(cloud.stats!.unlockedStickers || []),
+        ])),
+      }));
+    }
+  }, []); // eslint-disable-line
+
+  // On login: load IndexedDB then pull cloud
   useEffect(() => {
     if (!currentUser) return;
     Promise.all([
@@ -135,34 +161,38 @@ const App: React.FC = () => {
     ]).then(([localItems, localStories]) => {
       setItems(localItems);
       setStories(localStories);
-      // Pull cloud data and merge (cloud wins for items/stories, max for stats)
       setIsSyncing(true);
       downloadData(syncCode).then(cloud => {
         setIsSyncing(false);
         if (cloud.items.length) {
-          setItems(cloud.items);
-          saveItemsToDB(cloud.items).catch(() => {});
+          applyCloudData(cloud);
         } else if (localItems.length) {
-          // Nothing on cloud yet — push local data up
-          uploadData(syncCode, { items: localItems, stories: localStories, stats: null }).catch(() => {});
-        }
-        if (cloud.stories.length) setStories(cloud.stories);
-        if (cloud.stats) {
-          setStats(prev => ({
-            ...prev,
-            stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
-            cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
-            streak: cloud.stats!.streak || prev.streak || 0,
-            lastLoginDate: cloud.stats!.lastLoginDate || prev.lastLoginDate || '',
-            unlockedStickers: Array.from(new Set([
-              ...(prev.unlockedStickers || []),
-              ...(cloud.stats!.unlockedStickers || []),
-            ])),
-          }));
+          // First time — push local data up
+          uploadData(syncCode, { items: localItems, stories: localStories, stats: null })
+            .then(() => { lastPushTsRef.current = Date.now(); })
+            .catch(() => {});
         }
       }).catch(() => setIsSyncing(false));
     });
   }, [currentUser]); // eslint-disable-line
+
+  // Poll every 10s — apply cloud data only if newer than last known
+  useEffect(() => {
+    if (!currentUser) return;
+    const poll = async () => {
+      try {
+        const cloud = await downloadData(syncCode);
+        const cloudTs = cloud.updatedAt || 0;
+        // Skip if: no data, same as last received, or we just pushed this ourselves
+        if (!cloudTs || cloudTs <= lastCloudTsRef.current || cloudTs === lastPushTsRef.current) return;
+        setIsSyncing(true);
+        applyCloudData(cloud);
+        setTimeout(() => setIsSyncing(false), 600);
+      } catch {}
+    };
+    const timer = setInterval(poll, 10000);
+    return () => clearInterval(timer);
+  }, [currentUser, syncCode, applyCloudData]);
 
   // Streak calculation
   useEffect(() => {
@@ -263,14 +293,14 @@ const App: React.FC = () => {
               items: (overrideItems ?? currentItems).map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
               stories: overrideStories ?? currentStories,
               stats: currentStats,
-            }).catch(() => {});
+            }).then(() => { lastPushTsRef.current = Date.now(); }).catch(() => {});
             return currentStats;
           });
           return currentStories;
         });
         return currentItems;
       });
-    }, 2000);
+    }, 1000);
   }, [syncCode]); // eslint-disable-line
 
   useEffect(() => {
@@ -631,6 +661,14 @@ const App: React.FC = () => {
           onConfirm={handleNotifConfirm}
           onDismiss={handleNotifDismiss}
         />
+      )}
+
+      {/* Sync indicator */}
+      {isSyncing && (
+        <div className="fixed top-4 right-4 z-[200] flex items-center gap-2 bg-blue-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-lg animate-fade-in">
+          <CloudArrowUpIcon className="w-3.5 h-3.5 animate-bounce" />
+          <span>Sync...</span>
+        </div>
       )}
 
       {/* Global Error Toast */}
