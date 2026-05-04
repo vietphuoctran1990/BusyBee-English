@@ -18,14 +18,8 @@ import NotificationPrompt from './components/NotificationPrompt';
 import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType } from './types';
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
-import {
-  saveItemToCloud, saveItemsBatchToCloud, deleteItemFromCloud,
-  saveStoryToCloud, deleteStoryFromCloud,
-  saveStatsToCloud,
-  subscribeToItems, subscribeToStories, subscribeToStats,
-  generateSyncCode, checkSyncCodeExists, downloadSyncData, isFirestoreReady,
-} from './services/firebaseService';
-import { IS_FIREBASE_ENABLED } from './config';
+import { checkCodeExists, downloadData, uploadData } from './services/syncService';
+import { generateSyncCode } from './services/firebaseService';
 import {
   HeartIcon, HomeIcon, MagnifyingGlassIcon,
   TrophyIcon, StarIcon, BookOpenIcon,
@@ -109,7 +103,7 @@ const App: React.FC = () => {
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const notifPromptShownRef = useRef(false);
 
-  // Sync code — stable ID shared across devices for Firestore path
+  // Sync code — stable ID shared across devices
   const [syncCode, setSyncCode] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(SYNC_KEY);
@@ -120,7 +114,7 @@ const App: React.FC = () => {
     } catch { return generateSyncCode(); }
   });
   const [isSyncing, setIsSyncing] = useState(false);
-  const syncUnsubsRef = useRef<(() => void)[]>([]);
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
@@ -132,76 +126,43 @@ const App: React.FC = () => {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
 
-  // Load local data on startup then push to Firebase (first-time sync)
+  // On login: load local IndexedDB, then pull cloud data and merge
   useEffect(() => {
     if (!currentUser) return;
-    loadItemsFromDB(currentUser.id).then(localItems => {
+    Promise.all([
+      loadItemsFromDB(currentUser.id),
+      loadStoriesFromDB(currentUser.id),
+    ]).then(([localItems, localStories]) => {
       setItems(localItems);
-      if (IS_FIREBASE_ENABLED && localItems.length > 0) {
-        saveItemsBatchToCloud(syncCode, localItems).catch(() => {});
-      }
-    });
-    loadStoriesFromDB(currentUser.id).then(localStories => {
       setStories(localStories);
-      if (IS_FIREBASE_ENABLED && localStories.length > 0) {
-        localStories.forEach(s => saveStoryToCloud(syncCode, s).catch(() => {}));
-      }
-    });
-  }, [currentUser]); // eslint-disable-line
-
-  // Firebase realtime sync — subscribes once user is logged in
-  useEffect(() => {
-    if (!currentUser || !IS_FIREBASE_ENABLED) return;
-
-    // Unsubscribe any previous listeners
-    syncUnsubsRef.current.forEach(u => u());
-    syncUnsubsRef.current = [];
-
-    setIsSyncing(true);
-
-    // Items: Firestore → local state + IndexedDB cache
-    syncUnsubsRef.current.push(
-      subscribeToItems(syncCode, (cloudItems) => {
-        if (!cloudItems.length) { setIsSyncing(false); return; }
-        setItems(cloudItems);
-        saveItemsToDB(cloudItems).catch(() => {});
+      // Pull cloud data and merge (cloud wins for items/stories, max for stats)
+      setIsSyncing(true);
+      downloadData(syncCode).then(cloud => {
         setIsSyncing(false);
-      }),
-    );
-
-    // Stories: Firestore → local state
-    syncUnsubsRef.current.push(
-      subscribeToStories(syncCode, (cloudStories) => {
-        if (cloudStories.length) setStories(cloudStories);
-      }),
-    );
-
-    // Stats: merge cloud + local (take the higher values to avoid losing progress)
-    syncUnsubsRef.current.push(
-      subscribeToStats(syncCode, (cloudStats) => {
-        setStats(prev => {
-          const merged: UserStats = {
+        if (cloud.items.length) {
+          setItems(cloud.items);
+          saveItemsToDB(cloud.items).catch(() => {});
+        } else if (localItems.length) {
+          // Nothing on cloud yet — push local data up
+          uploadData(syncCode, { items: localItems, stories: localStories, stats: null }).catch(() => {});
+        }
+        if (cloud.stories.length) setStories(cloud.stories);
+        if (cloud.stats) {
+          setStats(prev => ({
             ...prev,
-            stars: Math.max(prev.stars || 0, cloudStats.stars || 0),
-            cardsCreated: Math.max(prev.cardsCreated || 0, cloudStats.cardsCreated || 0),
-            streak: cloudStats.streak || prev.streak || 0,
-            lastLoginDate: cloudStats.lastLoginDate || prev.lastLoginDate || '',
+            stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
+            cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
+            streak: cloud.stats!.streak || prev.streak || 0,
+            lastLoginDate: cloud.stats!.lastLoginDate || prev.lastLoginDate || '',
             unlockedStickers: Array.from(new Set([
               ...(prev.unlockedStickers || []),
-              ...(cloudStats.unlockedStickers || []),
+              ...(cloud.stats!.unlockedStickers || []),
             ])),
-          };
-          try { localStorage.setItem(STATS_KEY, JSON.stringify(merged)); } catch {}
-          return merged;
-        });
-      }),
-    );
-
-    return () => {
-      syncUnsubsRef.current.forEach(u => u());
-      syncUnsubsRef.current = [];
-    };
-  }, [currentUser, syncCode]); // eslint-disable-line
+          }));
+        }
+      }).catch(() => setIsSyncing(false));
+    });
+  }, [currentUser]); // eslint-disable-line
 
   // Streak calculation
   useEffect(() => {
@@ -291,10 +252,30 @@ const App: React.FC = () => {
     } catch {}
   };
 
+  // Debounced cloud push — called after any data change
+  const scheduleCloudPush = useCallback((overrideItems?: LearningItem[], overrideStories?: StoryData[]) => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = setTimeout(() => {
+      setItems(currentItems => {
+        setStories(currentStories => {
+          setStats(currentStats => {
+            uploadData(syncCode, {
+              items: (overrideItems ?? currentItems).map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+              stories: overrideStories ?? currentStories,
+              stats: currentStats,
+            }).catch(() => {});
+            return currentStats;
+          });
+          return currentStories;
+        });
+        return currentItems;
+      });
+    }, 2000);
+  }, [syncCode]); // eslint-disable-line
+
   useEffect(() => {
     try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {}
-    if (IS_FIREBASE_ENABLED && currentUser) saveStatsToCloud(syncCode, stats).catch(() => {});
-  }, [stats]); // eslint-disable-line
+  }, [stats]);
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
 
   const handleRewardStars = (amount: number) => {
@@ -342,7 +323,7 @@ const App: React.FC = () => {
 
       setItems(prev => prev.map(i => i.id === itemId ? finalItem : i));
       await saveItemsToDB([finalItem]);
-      if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, finalItem).catch(() => {});
+      scheduleCloudPush();
       setStats(prev => ({ ...prev, cardsCreated: (prev.cardsCreated || 0) + 1 }));
       playSFX('pop');
     } catch (e: any) {
@@ -365,17 +346,15 @@ const App: React.FC = () => {
       setItems(prev => {
         const updated = prev.map(i => i.id === id ? { ...i, imageUrl: newImageUrl, isRegeneratingImage: false } : i);
         const target = updated.find(i => i.id === id);
-        if (target) {
-          saveItemsToDB([target]);
-          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
-        }
+        if (target) saveItemsToDB([target]);
         return updated;
       });
+      scheduleCloudPush();
       playSFX('pop');
     } catch {
       setItems(prev => prev.map(i => i.id === id ? { ...i, isRegeneratingImage: false } : i));
     }
-  }, [items]);
+  }, [items, scheduleCloudPush]);
 
   // Fix #1: Regenerate audio properly (generate AI audio and store in item)
   const regenerateAudio = useCallback(async (id: string) => {
@@ -387,24 +366,22 @@ const App: React.FC = () => {
       setItems(prev => {
         const updated = prev.map(i => i.id === id ? { ...i, audioBase64, isRegeneratingAudio: false } : i);
         const target = updated.find(i => i.id === id);
-        if (target) {
-          saveItemsToDB([target]);
-          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
-        }
+        if (target) saveItemsToDB([target]);
         return updated;
       });
+      scheduleCloudPush();
       playSFX('pop');
     } catch {
       setItems(prev => prev.map(i => i.id === id ? { ...i, isRegeneratingAudio: false } : i));
     }
-  }, [items, settings.accent]);
+  }, [items, settings.accent, scheduleCloudPush]);
 
   const deleteItem = async (id: string) => {
     if (confirm(t.deleteCardConfirm)) {
       deletedItemIds.current.add(id);
       setItems(prev => prev.filter(i => i.id !== id));
       await deleteItemFromDB(id);
-      if (IS_FIREBASE_ENABLED) deleteItemFromCloud(syncCode, id).catch(() => {});
+      scheduleCloudPush();
       playSFX('click');
     }
   };
@@ -413,7 +390,7 @@ const App: React.FC = () => {
     if (confirm(t.deleteStoryConfirm)) {
       setStories(prev => prev.filter(s => s.id !== id));
       await deleteStoryFromDB(id);
-      if (IS_FIREBASE_ENABLED) deleteStoryFromCloud(syncCode, id).catch(() => {});
+      scheduleCloudPush();
       playSFX('click');
     }
   };
@@ -480,34 +457,28 @@ const App: React.FC = () => {
     }));
     setItems(importedItems);
     saveItemsToDB(importedItems);
-    if (IS_FIREBASE_ENABLED) saveItemsBatchToCloud(syncCode, importedItems).catch(() => {});
-    if (data.stories) {
-      setStories(data.stories);
-      if (IS_FIREBASE_ENABLED) {
-        (data.stories as StoryData[]).forEach(s => saveStoryToCloud(syncCode, s).catch(() => {}));
-      }
-    }
+    if (data.stories) setStories(data.stories);
+    scheduleCloudPush(importedItems, data.stories);
     playSFX('success');
   };
 
   const handleLinkCode = async (newCode: string): Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }> => {
-    if (!IS_FIREBASE_ENABLED) return { success: false, errorType: 'firebase_error' };
     const upperCode = newCode.toUpperCase();
-    const result = await checkSyncCodeExists(upperCode);
-    if (result === 'error') return { success: false, errorType: 'firebase_error' };
-    if (result === 'not_found') return { success: false, errorType: 'not_found' };
-    const { items: cloudItems, stories: cloudStories, stats: cloudStats } = await downloadSyncData(upperCode);
-    if (cloudItems.length) {
-      setItems(cloudItems);
-      await saveItemsToDB(cloudItems);
+    const status = await checkCodeExists(upperCode);
+    if (status === 'error') return { success: false, errorType: 'firebase_error' };
+    if (status === 'not_found') return { success: false, errorType: 'not_found' };
+    const cloud = await downloadData(upperCode);
+    if (cloud.items.length) {
+      setItems(cloud.items);
+      await saveItemsToDB(cloud.items);
     }
-    if (cloudStories.length) setStories(cloudStories);
-    if (cloudStats) {
+    if (cloud.stories.length) setStories(cloud.stories);
+    if (cloud.stats) {
       setStats(prev => ({
         ...prev,
-        stars: Math.max(prev.stars || 0, cloudStats.stars || 0),
-        cardsCreated: Math.max(prev.cardsCreated || 0, cloudStats.cardsCreated || 0),
-        unlockedStickers: Array.from(new Set([...(prev.unlockedStickers || []), ...(cloudStats.unlockedStickers || [])])),
+        stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
+        cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
+        unlockedStickers: Array.from(new Set([...(prev.unlockedStickers || []), ...(cloud.stats!.unlockedStickers || [])])),
       }));
     }
     setSyncCode(upperCode);
@@ -595,10 +566,8 @@ const App: React.FC = () => {
             const updated = items.map(i => i.id === itemToSave ? { ...i, isSaved: true, topic } : i);
             setItems(updated);
             const target = updated.find(i => i.id === itemToSave);
-            if (target) {
-              await saveItemsToDB([target]);
-              if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
-            }
+            if (target) await saveItemsToDB([target]);
+            scheduleCloudPush();
             setItemToSave(null);
             playSFX('star');
           }}
@@ -616,10 +585,8 @@ const App: React.FC = () => {
             const updated = items.map(i => i.id === id ? { ...i, vietnameseTranslation: meaning, example: ex } : i);
             setItems(updated);
             const target = updated.find(i => i.id === id);
-            if (target) {
-              await saveItemsToDB([target]);
-              if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
-            }
+            if (target) await saveItemsToDB([target]);
+            scheduleCloudPush();
             playSFX('success');
           }}
           lang={settings.language}
@@ -634,7 +601,7 @@ const App: React.FC = () => {
             const newStory = { ...story, id: story.id || 'story_' + Date.now(), userId: currentUser.id };
             await saveStoryToDB(newStory);
             setStories(prev => [newStory, ...prev]);
-            if (IS_FIREBASE_ENABLED) saveStoryToCloud(syncCode, newStory).catch(() => {});
+            scheduleCloudPush();
             playSFX('success');
           }}
           isSaved={stories.some(s => s.id === activeStory.id)}
@@ -914,10 +881,8 @@ const App: React.FC = () => {
                         const updated = items.map(i => i.id === id ? { ...i, isSaved: false } : i);
                         setItems(updated);
                         const target = updated.find(i => i.id === id);
-                        if (target) {
-                          saveItemsToDB([target]);
-                          if (IS_FIREBASE_ENABLED) saveItemToCloud(syncCode, target).catch(() => {});
-                        }
+                        if (target) saveItemsToDB([target]);
+                        scheduleCloudPush();
                         playSFX('click');
                       }}
                       onRegenerateImage={regenerateImage}

@@ -5,6 +5,9 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions]
+  directory = "netlify/functions"
+
 # SPA routing - redirect tất cả requests về index.html
 [[redirects]]
   from = "/*"
