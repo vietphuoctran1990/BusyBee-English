@@ -152,7 +152,7 @@ const App: React.FC = () => {
     }
   }, []); // eslint-disable-line
 
-  // On login: load IndexedDB then pull cloud
+  // On login: load IndexedDB then pull cloud — MERGE both to avoid data loss
   useEffect(() => {
     if (!currentUser) return;
     Promise.all([
@@ -164,10 +164,44 @@ const App: React.FC = () => {
       setIsSyncing(true);
       downloadData(syncCode).then(cloud => {
         setIsSyncing(false);
-        if (cloud.items.length) {
-          applyCloudData(cloud);
+        if (cloud.items.length || cloud.stories.length) {
+          // Merge: cloud version wins for duplicates, but keep local-only items
+          const cloudItemIds = new Set(cloud.items.map(i => i.id));
+          const localOnlyItems = localItems.filter(i => !cloudItemIds.has(i.id));
+          const mergedItems = [...cloud.items, ...localOnlyItems]
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+          const cloudStoryIds = new Set(cloud.stories.map(s => s.id));
+          const localOnlyStories = localStories.filter(s => !cloudStoryIds.has(s.id));
+          const mergedStories = [...cloud.stories, ...localOnlyStories];
+
+          setItems(mergedItems);
+          setStories(mergedStories);
+          saveItemsToDB(mergedItems).catch(() => {});
+          lastCloudTsRef.current = cloud.updatedAt || 0;
+
+          // If local had items cloud didn't know about, push merged set up
+          if (localOnlyItems.length > 0 || localOnlyStories.length > 0) {
+            uploadData(syncCode, { items: mergedItems, stories: mergedStories, stats: null })
+              .then(() => { lastPushTsRef.current = Date.now(); })
+              .catch(() => {});
+          }
+
+          if (cloud.stats) {
+            setStats(prev => ({
+              ...prev,
+              stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
+              cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
+              streak: cloud.stats!.streak || prev.streak || 0,
+              lastLoginDate: cloud.stats!.lastLoginDate || prev.lastLoginDate || '',
+              unlockedStickers: Array.from(new Set([
+                ...(prev.unlockedStickers || []),
+                ...(cloud.stats!.unlockedStickers || []),
+              ])),
+            }));
+          }
         } else if (localItems.length) {
-          // First time — push local data up
+          // Cloud empty — push all local data up
           uploadData(syncCode, { items: localItems, stories: localStories, stats: null })
             .then(() => { lastPushTsRef.current = Date.now(); })
             .catch(() => {});
