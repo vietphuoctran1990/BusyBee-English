@@ -5,6 +5,7 @@ import { StarIcon } from '@heroicons/react/24/solid';
 import { UserProfile, AppSettings, LanguageType, AccentType, UserStats } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
 import { IS_FIREBASE_ENABLED } from '../config';
+import { isFirestoreReady } from '../services/firebaseService';
 
 interface SettingsModalProps {
   user: UserProfile;
@@ -18,7 +19,7 @@ interface SettingsModalProps {
   onExportData: () => void;
   onImportData: (data: any) => void;
   syncCode?: string;
-  onLinkCode?: (code: string) => Promise<{ success: boolean }>;
+  onLinkCode?: (code: string) => Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }>;
 }
 
 const AVATARS = [
@@ -60,7 +61,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Sync section state
   const [linkInput, setLinkInput] = useState('');
   const [isLinking, setIsLinking] = useState(false);
-  const [linkStatus, setLinkStatus] = useState<{ success: boolean } | null>(null);
+  const [linkStatus, setLinkStatus] = useState<{ success: boolean; errorType?: 'not_found' | 'firebase_error' } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleToggleNotif = async () => {
@@ -388,10 +389,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   </button>
                 </div>
                 <p className="text-xs text-indigo-400 font-bold">{t.syncCodeDesc}</p>
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                  <span className="text-xs font-black text-green-600">{t.syncLive}</span>
-                </div>
+                {isFirestoreReady() ? (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                    <span className="text-xs font-black text-green-600">{t.syncLive}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                    <span className="text-xs font-black text-red-600">
+                      {tempSettings.language === 'vn'
+                        ? 'Firebase chưa kết nối — kiểm tra Firestore Rules'
+                        : 'Firebase not connected — check Firestore Rules'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Link another device */}
@@ -417,7 +429,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 {linkStatus !== null && (
                   <p className={`text-sm font-bold ${linkStatus.success ? 'text-green-600' : 'text-red-500'}`}>
-                    {linkStatus.success ? t.syncLinked : t.syncLinkError}
+                    {linkStatus.success
+                      ? t.syncLinked
+                      : linkStatus.errorType === 'firebase_error'
+                        ? (tempSettings.language === 'vn'
+                            ? '⚠️ Firebase lỗi kết nối — kiểm tra Firestore Security Rules'
+                            : '⚠️ Firebase connection error — check Firestore Security Rules')
+                        : t.syncLinkError}
                   </p>
                 )}
               </div>

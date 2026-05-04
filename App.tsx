@@ -23,7 +23,7 @@ import {
   saveStoryToCloud, deleteStoryFromCloud,
   saveStatsToCloud,
   subscribeToItems, subscribeToStories, subscribeToStats,
-  generateSyncCode, checkSyncCodeExists, downloadSyncData,
+  generateSyncCode, checkSyncCodeExists, downloadSyncData, isFirestoreReady,
 } from './services/firebaseService';
 import { IS_FIREBASE_ENABLED } from './config';
 import {
@@ -490,11 +490,12 @@ const App: React.FC = () => {
     playSFX('success');
   };
 
-  const handleLinkCode = async (newCode: string): Promise<{ success: boolean }> => {
-    if (!IS_FIREBASE_ENABLED) return { success: false };
+  const handleLinkCode = async (newCode: string): Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }> => {
+    if (!IS_FIREBASE_ENABLED || !isFirestoreReady()) return { success: false, errorType: 'firebase_error' };
     const upperCode = newCode.toUpperCase();
-    const exists = await checkSyncCodeExists(upperCode);
-    if (!exists) return { success: false };
+    const result = await checkSyncCodeExists(upperCode);
+    if (result === 'error') return { success: false, errorType: 'firebase_error' };
+    if (result === 'not_found') return { success: false, errorType: 'not_found' };
     const { items: cloudItems, stories: cloudStories, stats: cloudStats } = await downloadSyncData(upperCode);
     if (cloudItems.length) {
       setItems(cloudItems);
