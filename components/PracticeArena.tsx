@@ -4,6 +4,7 @@ import { LearningItem, GameType, LanguageType } from '../types';
 import { SpeakerWaveIcon, CheckCircleIcon, XCircleIcon, TrophyIcon, MicrophoneIcon, StarIcon, XMarkIcon, LanguageIcon, ArrowPathIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { speakWithBrowser, playSFX } from '../services/audioUtils';
 import { TRANSLATIONS } from '../utils/translations';
+import BeeAvatar, { BeeMood } from './BeeAvatar';
 
 interface PracticeArenaProps {
   items: LearningItem[];
@@ -59,6 +60,8 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
   const [transcript, setTranscript] = useState('');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [speakingScore, setSpeakingScore] = useState<number | null>(null);
+  const [beeMood, setBeeMood] = useState<BeeMood>('idle');
+  const beeMoodTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const isTransitioning = useRef(false);
 
@@ -168,15 +171,23 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
       setSrsUpdates(prev => [...prev, { itemId: currentItem.id, update }]);
     }
 
+    beeMoodTimers.current.forEach(clearTimeout);
+    beeMoodTimers.current = [];
+
     if (success) {
       setScore(s => s + 1);
       playSFX('star');
       haptic([30, 20, 80]);
       setFeedback('correct');
+      setBeeMood('celebrate');
+      beeMoodTimers.current.push(setTimeout(() => setBeeMood('happy'), 1400));
+      beeMoodTimers.current.push(setTimeout(() => setBeeMood('idle'), 2800));
     } else {
       playSFX('click');
       haptic(100);
       setFeedback('incorrect');
+      setBeeMood('sad');
+      beeMoodTimers.current.push(setTimeout(() => setBeeMood('idle'), 2000));
     }
 
     setTimeout(() => {
@@ -205,7 +216,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
     const results = srsUpdates.map(u => ({ itemId: u.itemId, success: (u.update.proficiency ?? 0) > 0, srsUpdate: u.update }));
     return (
       <div className="fixed inset-0 bg-[#F0F9FF] flex flex-col items-center justify-center p-6 text-center animate-scale-up z-[200] safe-inset">
-        <TrophyIcon className="w-20 h-20 sm:w-28 sm:h-28 md:w-40 md:h-40 text-yellow-400 mb-4 md:mb-6 animate-bounce" />
+        <BeeAvatar mood="celebrate" size="xl" className="mb-4 md:mb-6" />
         <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-indigo-900 mb-3">{t.greatJob}</h2>
         <p className="text-base sm:text-lg md:text-2xl text-indigo-500 font-bold mb-6">{t.youGot} {score}/{items.length} {t.correct}</p>
         <div className="clay-card p-5 md:p-10 bg-yellow-50 flex items-center gap-4 md:gap-6 mb-8 animate-float mx-auto shadow-xl">
@@ -259,6 +270,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
           <XMarkIcon className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
           <span className="hidden sm:inline">{t.endPractice}</span>
         </button>
+        <BeeAvatar mood={beeMood} size="sm" className="shrink-0" />
 
         <div className="flex-1 flex items-center gap-2 md:gap-4 min-w-0">
           <span className="font-black text-indigo-500 text-xs sm:text-sm md:text-lg shrink-0">

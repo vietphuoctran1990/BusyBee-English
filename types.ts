@@ -98,3 +98,13 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
 }
+
+export interface Deck {
+  id: string;
+  userId: string;
+  name: string;
+  emoji: string;
+  color: string;
+  itemIds: string[];
+  createdAt: number;
+}

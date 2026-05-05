@@ -212,6 +212,46 @@
   [data-font="M"] { font-size: 100%; }
   [data-font="L"] { font-size: 115%; }
 
+  /* ── Bee Avatar Moods ─────────────────────────────────────────────────── */
+  @keyframes bee-happy {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    25% { transform: translateY(-14px) rotate(-12deg) scale(1.12); }
+    50% { transform: translateY(-8px) rotate(5deg) scale(1.06); }
+    75% { transform: translateY(-12px) rotate(10deg) scale(1.1); }
+  }
+  @keyframes bee-sad {
+    0%, 100% { transform: rotate(0deg) translateY(0); }
+    20% { transform: rotate(-9deg) translateY(3px); }
+    40% { transform: rotate(9deg) translateY(3px); }
+    60% { transform: rotate(-7deg) translateY(3px); }
+    80% { transform: rotate(7deg) translateY(3px); }
+  }
+  @keyframes bee-celebrate {
+    0% { transform: scale(1) rotate(0deg) translateY(0); }
+    15% { transform: scale(1.3) rotate(-15deg) translateY(-10px); }
+    30% { transform: scale(1.2) rotate(10deg) translateY(-16px); }
+    50% { transform: scale(1.25) rotate(-8deg) translateY(-12px); }
+    75% { transform: scale(1.1) rotate(5deg) translateY(-4px); }
+    100% { transform: scale(1) rotate(0deg) translateY(0); }
+  }
+  @keyframes bee-thinking {
+    0%, 100% { transform: rotate(-10deg) translateY(0); }
+    50% { transform: rotate(10deg) translateY(-5px); }
+  }
+  @keyframes bee-star-pop {
+    0% { transform: scale(0) rotate(0deg); opacity: 0; }
+    40% { transform: scale(1.4) rotate(180deg); opacity: 1; }
+    100% { transform: scale(0) rotate(360deg); opacity: 0; }
+  }
+  .bee-happy { animation: bee-happy 0.6s ease-in-out 3; }
+  .bee-sad { animation: bee-sad 0.5s ease-in-out infinite; }
+  .bee-celebrate { animation: bee-celebrate 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite; }
+  .bee-thinking { animation: bee-thinking 1.2s ease-in-out infinite; }
+  .bee-star-1 { animation: bee-star-pop 1.0s ease-out infinite; animation-delay: 0s; position: absolute; }
+  .bee-star-2 { animation: bee-star-pop 1.0s ease-out infinite; animation-delay: 0.3s; position: absolute; }
+  .bee-star-3 { animation: bee-star-pop 1.0s ease-out infinite; animation-delay: 0.6s; position: absolute; }
+  .bee-think-bubble { animation: float 1.8s ease-in-out infinite; }
+
   /* ── Dark theme ────────────────────────────────────────────────────────── */
   html[data-dark] body {
     background-color: #0F172A;

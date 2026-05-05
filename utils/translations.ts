@@ -279,6 +279,17 @@ export const TRANSLATIONS = {
     emptyStoriesDesc: "Go to Collection, select words, and tap Magic Story.",
     emptyPracticeTitle: "Nothing to practice!",
     emptyPracticeDesc: "Save at least 2 cards to start a practice game.",
+    // Deck
+    deckLabel: "Decks",
+    deckCreate: "New Deck",
+    deckName: "Deck name...",
+    deckEmpty: "No decks yet!",
+    deckEmptyDesc: "Create a deck to organize your vocabulary by theme.",
+    deckDelete: "Delete Deck",
+    deckDeleteConfirm: "Delete this deck? Cards won't be deleted.",
+    deckManage: "Manage Decks",
+    deckCards: "cards",
+    deckAll: "All Cards",
   },
   vn: {
     welcome: "Chào mừng bé đến với Busy Bee English!",
@@ -559,5 +570,16 @@ export const TRANSLATIONS = {
     emptyStoriesDesc: "Vào Bộ Sưu Tập, chọn từ vựng và nhấn Truyện Thần Kỳ.",
     emptyPracticeTitle: "Chưa có gì để luyện tập!",
     emptyPracticeDesc: "Lưu ít nhất 2 thẻ để bắt đầu trò chơi luyện tập.",
+    // Deck
+    deckLabel: "Bộ Thẻ",
+    deckCreate: "Tạo Bộ Mới",
+    deckName: "Tên bộ thẻ...",
+    deckEmpty: "Chưa có bộ thẻ nào!",
+    deckEmptyDesc: "Tạo bộ thẻ để sắp xếp từ vựng theo chủ đề.",
+    deckDelete: "Xóa Bộ Thẻ",
+    deckDeleteConfirm: "Xóa bộ thẻ này? Các thẻ sẽ không bị xóa.",
+    deckManage: "Quản Lý Bộ Thẻ",
+    deckCards: "thẻ",
+    deckAll: "Tất Cả",
   }
 };

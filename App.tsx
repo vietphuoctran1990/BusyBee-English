@@ -19,7 +19,8 @@ import QuickQuizModal from './components/QuickQuizModal';
 import DailyChallengeModal from './components/DailyChallengeModal';
 import StatsModal from './components/StatsModal';
 import { FocusModeSetup, FocusModePinOverlay, isFocusModeLocked } from './components/FocusModeModal';
-import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType } from './types';
+import DeckManagerModal from './components/DeckManagerModal';
+import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType, Deck } from './types';
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation, generateWordFamilies } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
 import { checkCodeExists, downloadData, uploadData } from './services/syncService';
@@ -39,6 +40,7 @@ const STATS_KEY = 'kidlingo_stats_clay_v2';
 const SETTINGS_KEY = 'kidlingo_settings_clay_v2';
 const NOTIF_KEY = 'busybee_notif_prefs';
 const SYNC_KEY = 'busybee_sync_code';
+const DECKS_KEY = 'busybee_decks_v1';
 
 type SortOrder = 'newest' | 'oldest' | 'alpha';
 
@@ -144,6 +146,13 @@ const App: React.FC = () => {
   const [focusLocked, setFocusLocked] = useState(() => isFocusModeLocked());
   const [practiceStarsMultiplier, setPracticeStarsMultiplier] = useState(1);
   const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
+
+  // Deck system
+  const [decks, setDecks] = useState<Deck[]>(() => {
+    try { const s = localStorage.getItem(DECKS_KEY); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [showDeckManager, setShowDeckManager] = useState(false);
+  const [activeDeck, setActiveDeck] = useState<string | null>(null);
 
   // Sync code — stable ID shared across devices
   const [syncCode, setSyncCode] = useState<string>(() => {
@@ -394,6 +403,7 @@ const App: React.FC = () => {
     try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {}
   }, [stats]);
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
+  useEffect(() => { try { localStorage.setItem(DECKS_KEY, JSON.stringify(decks)); } catch {} }, [decks]);
 
   // Apply dark mode to html element
   useEffect(() => {
@@ -579,15 +589,17 @@ const App: React.FC = () => {
 
   // Fix #8: Separate filtered/sorted saved items with own search
   const filteredSavedItems = useMemo(() => {
+    const activeDeckObj = activeDeck ? decks.find(d => d.id === activeDeck) : null;
     const saved = items.filter(item => {
       if (!item.isSaved) return false;
       const matchesSearch = item.text.toLowerCase().includes(savedSearchQuery.toLowerCase()) ||
         (item.vietnameseTranslation || '').toLowerCase().includes(savedSearchQuery.toLowerCase());
       const matchesTopic = activeSavedTopic ? (item.topic === activeSavedTopic) : true;
-      return matchesSearch && matchesTopic;
+      const matchesDeck = activeDeckObj ? activeDeckObj.itemIds.includes(item.id) : true;
+      return matchesSearch && matchesTopic && matchesDeck;
     });
     return applySortOrder(saved, sortOrder);
-  }, [items, savedSearchQuery, activeSavedTopic, sortOrder, applySortOrder]);
+  }, [items, savedSearchQuery, activeSavedTopic, activeDeck, decks, sortOrder, applySortOrder]);
 
   const topics = useMemo(() => Array.from(new Set(items.filter(i => i.isSaved).map(i => i.topic || 'General'))), [items]);
 
@@ -629,6 +641,40 @@ const App: React.FC = () => {
     if (data.stories) setStories(data.stories);
     scheduleCloudPush();
     playSFX('success');
+  };
+
+  const handleCreateDeck = (name: string, emoji: string, color: string) => {
+    if (!currentUser) return;
+    const newDeck: Deck = {
+      id: 'deck_' + Date.now(),
+      userId: currentUser.id,
+      name,
+      emoji,
+      color,
+      itemIds: [],
+      createdAt: Date.now(),
+    };
+    setDecks(prev => [...prev, newDeck]);
+    playSFX('pop');
+  };
+
+  const handleDeleteDeck = (id: string) => {
+    setDecks(prev => prev.filter(d => d.id !== id));
+    if (activeDeck === id) setActiveDeck(null);
+    playSFX('click');
+  };
+
+  const handleToggleItemInDeck = (deckId: string, itemId: string) => {
+    setDecks(prev => prev.map(d => {
+      if (d.id !== deckId) return d;
+      const inDeck = d.itemIds.includes(itemId);
+      return { ...d, itemIds: inDeck ? d.itemIds.filter(id => id !== itemId) : [...d.itemIds, itemId] };
+    }));
+  };
+
+  const handleRenameDeck = (id: string, name: string, emoji: string) => {
+    setDecks(prev => prev.map(d => d.id === id ? { ...d, name, emoji } : d));
+    playSFX('pop');
   };
 
   const handleLinkCode = async (newCode: string): Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }> => {
@@ -837,6 +883,18 @@ const App: React.FC = () => {
       )}
       {showSlideshow && <SlideshowModal items={view === 'saved' ? filteredSavedItems : filteredItems} onClose={() => setShowSlideshow(false)} lang={settings.language} />}
 
+      {showDeckManager && (
+        <DeckManagerModal
+          decks={decks}
+          items={items}
+          lang={settings.language}
+          onClose={() => setShowDeckManager(false)}
+          onCreateDeck={handleCreateDeck}
+          onDeleteDeck={handleDeleteDeck}
+          onToggleItemInDeck={handleToggleItemInDeck}
+          onRenameDeck={handleRenameDeck}
+        />
+      )}
       {itemToSave && (
         <SaveTopicModal
           isOpen={!!itemToSave}
@@ -1164,6 +1222,35 @@ const App: React.FC = () => {
                 <SortBar />
               </div>
 
+              {/* Deck filter row */}
+              {decks.length > 0 && (
+                <div className="clay-card p-4 md:p-6 border-white bg-white/70 shadow-md">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-black text-blue-900 uppercase text-xs tracking-widest">{t.deckLabel}</span>
+                    <button onClick={() => setShowDeckManager(true)} className="text-xs font-black text-blue-400 hover:text-blue-600 transition-colors">{t.deckManage}</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setActiveDeck(null)}
+                      className={`px-4 py-2 rounded-2xl font-black text-sm transition-all border-2 ${activeDeck === null ? 'bg-blue-500 text-white border-blue-300 shadow-md' : 'bg-white text-blue-400 border-blue-50 hover:bg-blue-50'}`}
+                    >
+                      {t.deckAll}
+                    </button>
+                    {decks.map(deck => (
+                      <button
+                        key={deck.id}
+                        onClick={() => setActiveDeck(activeDeck === deck.id ? null : deck.id)}
+                        className={`px-4 py-2 rounded-2xl font-black text-sm transition-all border-2 flex items-center gap-1.5 ${activeDeck === deck.id ? 'bg-blue-500 text-white border-blue-300 shadow-md' : 'bg-white text-blue-500 border-blue-100 hover:bg-blue-50'}`}
+                      >
+                        <span>{deck.emoji}</span>
+                        <span>{deck.name}</span>
+                        <span className="text-[10px] opacity-60">({deck.itemIds.length})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="clay-card p-5 md:p-8 border-white bg-white/70 shadow-md">
                 <div className="flex items-center gap-3 mb-4">
                   <TagIcon className="w-6 h-6 md:w-7 md:h-7 text-blue-400" />
@@ -1187,6 +1274,16 @@ const App: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Manage decks button when no decks exist */}
+              {decks.length === 0 && (
+                <button
+                  onClick={() => setShowDeckManager(true)}
+                  className="w-full py-3 bg-white/60 border-2 border-dashed border-blue-100 rounded-2xl text-blue-300 font-black text-sm flex items-center justify-center gap-2 hover:border-blue-300 hover:text-blue-400 transition-all"
+                >
+                  📚 {t.deckCreate}
+                </button>
+              )}
 
               {/* Fix #7: Empty state for saved */}
               {filteredSavedItems.length === 0 ? (

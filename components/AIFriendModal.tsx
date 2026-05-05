@@ -5,6 +5,7 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import { LanguageType, FriendMode, ChatMessage, LearningItem, UserProfile } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
 import { playSFX } from '../services/audioUtils';
+import BeeAvatar, { BeeMood } from './BeeAvatar';
 
 interface AIFriendModalProps {
   onClose: () => void;
@@ -22,6 +23,8 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [beeMood, setBeeMood] = useState<BeeMood>('idle');
+  const beeMoodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatSessionRef = useRef<Chat | null>(null);
 
@@ -59,16 +62,23 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
     setInputText('');
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: userText, timestamp: Date.now() }]);
     setIsTyping(true);
+    setBeeMood('thinking');
     playSFX('click');
+
+    const setBeeFor = (mood: BeeMood, ms: number) => {
+      if (beeMoodTimer.current) clearTimeout(beeMoodTimer.current);
+      setBeeMood(mood);
+      beeMoodTimer.current = setTimeout(() => setBeeMood('idle'), ms);
+    };
 
     try {
         if (!chatSessionRef.current) {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             chatSessionRef.current = ai.chats.create({
                 model: "gemini-3-flash-preview",
-                config: { 
-                  systemInstruction: `You are ${friendName}, a cheerful AI friend for a child named ${userProfile.name} who is ${userProfile.age} years old. 
-                  Use lots of emojis. Keep sentences short and simple. Help them practice English. Occasionally correct their English gently if they make mistakes.` 
+                config: {
+                  systemInstruction: `You are ${friendName}, a cheerful AI friend for a child named ${userProfile.name} who is ${userProfile.age} years old.
+                  Use lots of emojis. Keep sentences short and simple. Help them practice English. Occasionally correct their English gently if they make mistakes.`
                 }
             });
         }
@@ -76,8 +86,10 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: result.text || "✨", timestamp: Date.now() }]);
         if (onReward && messages.length % 5 === 0) onReward(2);
         playSFX('pop');
+        setBeeFor('happy', 2500);
     } catch (e) {
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: "Mình đang bận một xíu, bé đợi tí nhé! 🔋", timestamp: Date.now() }]);
+        setBeeFor('sad', 2000);
     } finally { setIsTyping(false); }
   };
 
@@ -99,10 +111,12 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
                 {!fullView ? (
                   <button onClick={onClose} className="p-2 bg-white/20 rounded-full md:hidden"><ArrowLeftIcon className="w-6 h-6"/></button>
                 ) : null}
-                <div className="text-4xl md:text-6xl animate-float shrink-0">{avatarEmoji}</div>
+                <BeeAvatar mood={beeMood} size="md" className="shrink-0" />
                 <div className="min-w-0">
                     <h2 className="text-xl md:text-3xl font-black truncate">{friendName}</h2>
-                    <p className="text-indigo-200 font-bold text-[10px] md:text-sm uppercase tracking-wider">Online ✨</p>
+                    <p className="text-indigo-200 font-bold text-[10px] md:text-sm uppercase tracking-wider">
+                      {beeMood === 'thinking' ? (isTyping ? '🤔 Đang suy nghĩ...' : 'Online ✨') : 'Online ✨'}
+                    </p>
                 </div>
             </div>
             {!fullView && <button onClick={onClose} className="hidden md:block p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"><XMarkIcon className="w-8 h-8"/></button>}
@@ -182,7 +196,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
             ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <div className={`w-40 h-40 md:w-64 md:h-64 rounded-full flex items-center justify-center mb-8 transition-all duration-500 bg-white shadow-xl ${isAiSpeaking ? 'ring-[20px] ring-indigo-100 scale-110' : ''}`}>
-                        <span className={`text-7xl md:text-[120px] ${isAiSpeaking ? 'animate-bounce' : 'animate-float'}`}>{avatarEmoji}</span>
+                        <BeeAvatar mood={isAiSpeaking ? 'happy' : 'idle'} size="xl" />
                     </div>
                     <h3 className="text-2xl md:text-3xl font-black text-indigo-900 mb-2">{isLiveConnected ? (isAiSpeaking ? 'Đang nói...' : 'Đang nghe bé...') : 'Sẵn sàng kết nối!'}</h3>
                     <p className="text-indigo-400 font-bold text-xs md:text-sm mb-10 max-w-xs">Hãy sử dụng chế độ Chat để trò chuyện với bạn nhé!</p>
