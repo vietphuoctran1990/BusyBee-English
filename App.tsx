@@ -15,8 +15,12 @@ import SlideshowModal from './components/SlideshowModal';
 import StoryCreationSetup from './components/StoryCreationSetup';
 import LoginScreen from './components/LoginScreen';
 import NotificationPrompt from './components/NotificationPrompt';
+import QuickQuizModal from './components/QuickQuizModal';
+import DailyChallengeModal from './components/DailyChallengeModal';
+import StatsModal from './components/StatsModal';
+import { FocusModeSetup, FocusModePinOverlay, isFocusModeLocked } from './components/FocusModeModal';
 import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType } from './types';
-import { generateIllustration, generateCardDetails, generateStory, generatePronunciation } from './services/geminiService';
+import { generateIllustration, generateCardDetails, generateStory, generatePronunciation, generateWordFamilies } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
 import { checkCodeExists, downloadData, uploadData } from './services/syncService';
 import { generateSyncCode } from './services/firebaseService';
@@ -25,7 +29,7 @@ import {
   TrophyIcon, StarIcon, BookOpenIcon,
   UsersIcon, KeyIcon, PlayIcon, SparklesIcon,
   ExclamationTriangleIcon, XMarkIcon, IdentificationIcon, ArrowPathIcon, TrashIcon, TagIcon,
-  FunnelIcon, FireIcon, ChartBarIcon, CloudArrowUpIcon,
+  FunnelIcon, FireIcon, ChartBarIcon, CloudArrowUpIcon, BoltIcon, ShieldCheckIcon,
 } from '@heroicons/react/24/solid';
 import { TRANSLATIONS } from './utils/translations';
 import { playSFX } from './services/audioUtils';
@@ -102,6 +106,44 @@ const App: React.FC = () => {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const notifPromptShownRef = useRef(false);
+
+  // Pull-to-refresh state
+  const pullStartY = useRef<number>(0);
+  const [pullY, setPullY] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const PULL_THRESHOLD = 70;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (window.scrollY === 0) pullStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pullStartY.current || window.scrollY > 0) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0) setPullY(Math.min(delta * 0.4, PULL_THRESHOLD + 20));
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (pullY >= PULL_THRESHOLD && !isRefreshing) {
+      setIsRefreshing(true);
+      // Trigger sync
+      downloadData(syncCode).then(cloud => {
+        if (cloud.updatedAt) mergeCloudData(cloud);
+        setTimeout(() => setIsRefreshing(false), 800);
+      }).catch(() => setIsRefreshing(false));
+    }
+    pullStartY.current = 0;
+    setPullY(0);
+  }, [pullY, isRefreshing, syncCode]); // eslint-disable-line
+
+  // New feature state
+  const [showQuickQuiz, setShowQuickQuiz] = useState(false);
+  const [showDailyChallenge, setShowDailyChallenge] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showFocusSetup, setShowFocusSetup] = useState(false);
+  const [focusLocked, setFocusLocked] = useState(() => isFocusModeLocked());
+  const [practiceStarsMultiplier, setPracticeStarsMultiplier] = useState(1);
+  const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
 
   // Sync code — stable ID shared across devices
   const [syncCode, setSyncCode] = useState<string>(() => {
@@ -353,6 +395,46 @@ const App: React.FC = () => {
   }, [stats]);
   useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
 
+  // Apply dark mode to html element
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.setAttribute('data-dark', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-dark');
+    }
+  }, [settings.darkMode]);
+
+  // Apply font size to html element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font', settings.fontSize ?? 'M');
+  }, [settings.fontSize]);
+
+  // Streak shield: award 1 shield every 7 days of streak (max 3)
+  useEffect(() => {
+    if (!currentUser) return;
+    if ((stats.streak || 0) > 0 && (stats.streak! % 7 === 0)) {
+      const current = stats.streakShield ?? 0;
+      if (current < 3) {
+        setStats(prev => ({ ...prev, streakShield: Math.min(3, (prev.streakShield ?? 0) + 1) }));
+      }
+    }
+  }, [stats.streak]); // eslint-disable-line
+
+  // Milestone toasts: 7, 30, 100 days
+  useEffect(() => {
+    if (!currentUser || !stats.streak) return;
+    const milestones = [7, 30, 100];
+    const seen = stats.milestonesSeen ?? [];
+    const hit = milestones.find(m => stats.streak === m && !seen.includes(m));
+    if (hit) {
+      const msg = hit === 7 ? t.milestone7 : hit === 30 ? t.milestone30 : t.milestone100;
+      setMilestoneToast(msg);
+      setStats(prev => ({ ...prev, milestonesSeen: [...(prev.milestonesSeen ?? []), hit] }));
+      playSFX('success');
+      setTimeout(() => setMilestoneToast(null), 5000);
+    }
+  }, [stats.streak]); // eslint-disable-line
+
   const handleRewardStars = (amount: number) => {
     setStats(prev => ({ ...prev, stars: prev.stars + amount }));
   };
@@ -384,6 +466,7 @@ const App: React.FC = () => {
 
       if (deletedItemIds.current.has(itemId)) return;
 
+      const isWord = !text.includes(' ');
       const finalItem: LearningItem = {
         ...newItem,
         text: details.englishText || text,
@@ -401,6 +484,17 @@ const App: React.FC = () => {
       scheduleCloudPush();
       setStats(prev => ({ ...prev, cardsCreated: (prev.cardsCreated || 0) + 1 }));
       playSFX('pop');
+
+      // Fetch word families in background for single words only
+      if (isWord) {
+        generateWordFamilies(finalItem.text).then(families => {
+          if (families.length > 0 && !deletedItemIds.current.has(itemId)) {
+            const withFamilies = { ...finalItem, wordFamilies: families };
+            setItems(prev => prev.map(i => i.id === itemId ? withFamilies : i));
+            saveItemsToDB([withFamilies]).catch(() => {});
+          }
+        });
+      }
     } catch (e: any) {
       const isQuotaError = e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED") || e.message?.includes("503") || e.message?.includes("UNAVAILABLE");
       const errorMsg = isQuotaError
@@ -563,14 +657,37 @@ const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // Focus mode overlay
+  if (focusLocked) {
+    return <FocusModePinOverlay lang={settings.language} onUnlock={() => setFocusLocked(false)} />;
+  }
+
   if (practiceGame.active) {
     return (
       <PracticeArena
         items={practiceGame.items}
         gameType={practiceGame.type}
         allItems={items}
+        starsMultiplier={practiceStarsMultiplier}
         onExit={(res, stars) => {
           if (stars) handleRewardStars(stars);
+          // Apply SRS updates from practice
+          if (res && res.length > 0) {
+            setItems(prev => prev.map(item => {
+              const update = (res as any[]).find((r: any) => r.itemId === item.id);
+              if (!update?.srsUpdate) return item;
+              const updated = { ...item, ...update.srsUpdate };
+              saveItemsToDB([updated]).catch(() => {});
+              return updated;
+            }));
+            scheduleCloudPush();
+          }
+          // Mark daily challenge done if multiplier was 2
+          if (practiceStarsMultiplier === 2) {
+            const today = new Date().toISOString().split('T')[0];
+            setStats(prev => ({ ...prev, lastChallengeDate: today }));
+          }
+          setPracticeStarsMultiplier(1);
           setPracticeGame(p => ({ ...p, active: false }));
         }}
         lang={settings.language}
@@ -593,9 +710,40 @@ const App: React.FC = () => {
     </div>
   );
 
+  const today = new Date().toISOString().split('T')[0];
+  const dailyChallengeAlreadyDone = stats.lastChallengeDate === today;
+  const srsReviewCount = items.filter(i => i.isSaved && (!i.srsNextReview || i.srsNextReview <= Date.now())).length;
+
   return (
-    <div className="min-h-screen bg-[#F0F9FF] pb-32 lg:pb-12" style={{ paddingBottom: 'max(128px, calc(128px + env(safe-area-inset-bottom)))' }}>
+    <div
+      className={`min-h-screen pb-32 lg:pb-12 ${settings.darkMode ? 'bg-gray-900' : 'bg-[#F0F9FF]'}`}
+      style={{ paddingBottom: 'max(128px, calc(128px + env(safe-area-inset-bottom)))' }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(pullY > 10 || isRefreshing) && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[300] flex items-center justify-center transition-all"
+          style={{ height: isRefreshing ? '48px' : `${pullY}px` }}
+        >
+          <div className={`flex items-center gap-2 bg-blue-500 text-white text-xs font-black px-4 py-2 rounded-full shadow-lg transition-all ${isRefreshing ? 'animate-pulse' : ''}`}>
+            <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? t.refreshing : pullY >= PULL_THRESHOLD ? t.releasing : t.pullToRefresh}
+          </div>
+        </div>
+      )}
+
+      {/* ── Milestone toast ── */}
+      {milestoneToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[300] bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-6 py-3 rounded-2xl shadow-2xl font-black text-sm animate-scale-up flex items-center gap-2">
+          🏆 {milestoneToast}
+        </div>
+      )}
+
       {showIntroModal && <IntroModal onClose={() => setShowIntroModal(false)} lang={settings.language} />}
+
       {showSettings && (
         <SettingsModal
           user={currentUser}
@@ -620,6 +768,61 @@ const App: React.FC = () => {
             return ok;
           }}
           onLinkCode={handleLinkCode}
+          onOpenFocusMode={() => { setShowSettings(false); setShowFocusSetup(true); }}
+        />
+      )}
+
+      {/* New modals */}
+      {showQuickQuiz && (
+        <QuickQuizModal
+          items={items}
+          lang={settings.language}
+          onClose={() => setShowQuickQuiz(false)}
+          onComplete={(stars, srsUpdates) => {
+            handleRewardStars(stars);
+            if (srsUpdates.length > 0) {
+              setItems(prev => prev.map(item => {
+                const u = srsUpdates.find(r => r.itemId === item.id);
+                if (!u) return item;
+                const updated = { ...item, ...u.update };
+                saveItemsToDB([updated]).catch(() => {});
+                return updated;
+              }));
+              scheduleCloudPush();
+            }
+            setShowQuickQuiz(false);
+          }}
+        />
+      )}
+
+      {showDailyChallenge && (
+        <DailyChallengeModal
+          items={items}
+          lang={settings.language}
+          alreadyDone={dailyChallengeAlreadyDone}
+          onClose={() => setShowDailyChallenge(false)}
+          onStart={(challengeItems) => {
+            setShowDailyChallenge(false);
+            setPracticeStarsMultiplier(2);
+            setPracticeGame({ active: true, type: 'listening', items: challengeItems });
+          }}
+        />
+      )}
+
+      {showStats && (
+        <StatsModal
+          stats={stats}
+          items={items}
+          lang={settings.language}
+          onClose={() => setShowStats(false)}
+        />
+      )}
+
+      {showFocusSetup && (
+        <FocusModeSetup
+          lang={settings.language}
+          onClose={() => setShowFocusSetup(false)}
+          onStart={() => { setShowFocusSetup(false); setFocusLocked(true); }}
         />
       )}
       {showStickerBook && (
@@ -749,6 +952,20 @@ const App: React.FC = () => {
                       <ChartBarIcon className="w-3 h-3 md:w-3.5 md:h-3.5" /> {stats.cardsCreated}
                     </div>
                   )}
+                  {/* Streak shield */}
+                  {(stats.streakShield ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-blue-100 px-2.5 py-1 rounded-full text-blue-600 font-black text-[11px] shadow-sm" title={t.streakShieldDesc}>
+                      <ShieldCheckIcon className="w-3 h-3" /> {stats.streakShield}
+                    </div>
+                  )}
+                  {/* Daily challenge badge */}
+                  <button
+                    onClick={() => setShowDailyChallenge(true)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-black text-[11px] shadow-sm transition-all ${dailyChallengeAlreadyDone ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600 animate-pulse'}`}
+                  >
+                    <BoltIcon className="w-3 h-3" />
+                    {dailyChallengeAlreadyDone ? '✓' : t.dailyChallenge.split(' ')[0]}
+                  </button>
                   {hasCustomKey && (
                     <div className="bg-indigo-500 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-sm shrink-0">
                       <KeyIcon className="w-2.5 h-2.5 md:w-3 md:h-3" /> PRO
@@ -770,6 +987,36 @@ const App: React.FC = () => {
             </div>
             <button onClick={() => setShowSettings(true)} className="md:hidden p-3 bg-blue-50 text-blue-500 rounded-2xl shadow-inner active:scale-90 transition-all">
               <IdentificationIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="hidden md:flex items-center gap-2">
+            {/* Streak shield indicator */}
+            {(stats.streakShield ?? 0) > 0 && (
+              <div className="flex items-center gap-1.5 bg-blue-100 px-3 py-2 rounded-2xl text-blue-600 font-black text-xs shadow-sm" title={t.streakShieldDesc}>
+                <ShieldCheckIcon className="w-4 h-4 text-blue-500" />
+                <span>{stats.streakShield}</span>
+              </div>
+            )}
+            {/* SRS review badge */}
+            {srsReviewCount > 0 && (
+              <button onClick={() => setShowQuickQuiz(true)} className="flex items-center gap-1.5 bg-indigo-500 text-white px-3 py-2 rounded-2xl font-black text-xs shadow-md hover:bg-indigo-600 active:scale-95 transition-all animate-pulse">
+                <TrophyIcon className="w-4 h-4" />
+                {srsReviewCount} {t.reviewDue}
+              </button>
+            )}
+            {/* Daily challenge */}
+            <button
+              onClick={() => setShowDailyChallenge(true)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all ${dailyChallengeAlreadyDone ? 'bg-green-100 text-green-600' : 'bg-orange-400 text-white hover:bg-orange-500'}`}
+            >
+              <BoltIcon className="w-4 h-4" />
+              {dailyChallengeAlreadyDone ? '✓' : t.dailyChallenge}
+            </button>
+            {/* Stats */}
+            <button onClick={() => setShowStats(true)} className="p-2 bg-blue-100 text-blue-500 rounded-2xl hover:bg-blue-200 transition-all active:scale-95">
+              <ChartBarIcon className="w-5 h-5" />
             </button>
           </div>
 
@@ -955,7 +1202,9 @@ const App: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-10">
+                <div className={settings.cardLayout === 'grid'
+                  ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-6'
+                  : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 md:gap-10'}>
                   {filteredSavedItems.map(item => (
                     <LearningCard
                       key={item.id}
@@ -1011,8 +1260,8 @@ const App: React.FC = () => {
                   {stories.length === 0 ? (
                     <div className="py-20 text-center animate-fade-in">
                       <div className="text-7xl mb-6 animate-float">📖</div>
-                      <h3 className="text-2xl md:text-3xl font-black text-indigo-300 mb-3">Chưa có câu chuyện nào!</h3>
-                      <p className="text-indigo-200 font-bold text-base max-w-xs mx-auto">Lưu thẻ rồi nhấn "Tạo truyện thần kỳ" để AI viết truyện cho bé nhé.</p>
+                      <h3 className="text-2xl md:text-3xl font-black text-indigo-300 mb-3">{t.emptyStoriesTitle}</h3>
+                      <p className="text-indigo-200 font-bold text-base max-w-xs mx-auto">{t.emptyStoriesDesc}</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
@@ -1042,7 +1291,33 @@ const App: React.FC = () => {
 
           {/* PRACTICE TAB */}
           {view === 'practice' && (
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Quick action row */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setShowQuickQuiz(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-indigo-500 text-white font-black rounded-2xl shadow-lg hover:bg-indigo-600 active:scale-95 transition-all"
+                >
+                  <TrophyIcon className="w-5 h-5" />
+                  {t.quickQuiz}
+                  {srsReviewCount > 0 && <span className="bg-white text-indigo-600 text-xs font-black px-2 py-0.5 rounded-full">{srsReviewCount}</span>}
+                </button>
+                <button
+                  onClick={() => setShowDailyChallenge(true)}
+                  className={`flex items-center gap-2 px-5 py-3 font-black rounded-2xl shadow-lg active:scale-95 transition-all ${dailyChallengeAlreadyDone ? 'bg-green-100 text-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}
+                >
+                  <BoltIcon className="w-5 h-5" />
+                  {t.dailyChallenge}
+                  {!dailyChallengeAlreadyDone && <span className="bg-white text-orange-500 text-xs font-black px-1.5 py-0.5 rounded-full">x2</span>}
+                </button>
+                <button
+                  onClick={() => setShowStats(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-blue-100 text-blue-700 font-black rounded-2xl shadow-sm hover:bg-blue-200 active:scale-95 transition-all"
+                >
+                  <ChartBarIcon className="w-5 h-5" />
+                  {t.statsScreen}
+                </button>
+              </div>
               <PracticeSetup
                 savedItems={items.filter(i => i.isSaved)}
                 onStartGame={(selected, type) => { setPracticeGame({ active: true, items: selected, type }); playSFX('click'); }}

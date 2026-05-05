@@ -1,10 +1,9 @@
 
 import React, { useState, useRef } from 'react';
-import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BellIcon, BellSlashIcon, ClockIcon, CloudArrowUpIcon, DocumentDuplicateIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, IdentificationIcon, FaceSmileIcon, KeyIcon, ArrowTopRightOnSquareIcon, SparklesIcon, FireIcon, ChartBarIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BellIcon, BellSlashIcon, ClockIcon, CloudArrowUpIcon, DocumentDuplicateIcon, MoonIcon, SunIcon, Squares2X2Icon, Bars3Icon, LockClosedIcon } from '@heroicons/react/24/solid';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { UserProfile, AppSettings, LanguageType, AccentType, UserStats } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
-import { IS_FIREBASE_ENABLED } from '../config';
 
 interface SettingsModalProps {
   user: UserProfile;
@@ -21,6 +20,7 @@ interface SettingsModalProps {
   isSyncing?: boolean;
   onSyncNow?: () => Promise<boolean>;
   onLinkCode?: (code: string) => Promise<{ success: boolean; errorType?: 'not_found' | 'firebase_error' }>;
+  onOpenFocusMode?: () => void;
 }
 
 const AVATARS = [
@@ -40,7 +40,7 @@ function formatHour(h: number) {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   user, settings, stats, onClose, onUpdateUser, onUpdateSettings, onSelectKey, hasCustomKey, onExportData, onImportData,
-  syncCode, isSyncing, onSyncNow, onLinkCode,
+  syncCode, isSyncing, onSyncNow, onLinkCode, onOpenFocusMode,
 }) => {
   const [tempUser, setTempUser] = useState<UserProfile>({ ...user });
   const [tempSettings, setTempSettings] = useState<AppSettings>({ ...settings });
@@ -328,6 +328,95 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   ))}
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Display Settings */}
+          <section className="space-y-5">
+            <h3 className="text-sm font-black text-blue-500 uppercase tracking-widest flex items-center gap-2 border-b-2 border-blue-50 pb-2">
+              <SunIcon className="w-5 h-5" /> {t.displaySection}
+            </h3>
+
+            {/* Dark mode */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 rounded-xl">
+                  <MoonIcon className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="font-black text-blue-900 text-sm">{t.darkModeLabel}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTempSettings({ ...tempSettings, darkMode: !tempSettings.darkMode })}
+                className={`w-14 h-7 rounded-full transition-all relative ${tempSettings.darkMode ? 'bg-indigo-500' : 'bg-gray-200'}`}
+              >
+                <div className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${tempSettings.darkMode ? 'translate-x-7' : ''}`} />
+              </button>
+            </div>
+
+            {/* Font size */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-blue-100 rounded-xl">
+                  <span className="text-blue-600 font-black text-sm">Aa</span>
+                </div>
+                <p className="font-black text-blue-900 text-sm">{t.fontSizeLabel}</p>
+              </div>
+              <div className="flex bg-blue-50/50 p-2 rounded-[2rem] border-4 border-blue-50">
+                {(['S', 'M', 'L'] as const).map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setTempSettings({ ...tempSettings, fontSize: size })}
+                    className={`flex-1 py-2.5 rounded-[1.5rem] font-black transition-all text-sm ${(tempSettings.fontSize ?? 'M') === size ? 'bg-white text-blue-600 shadow-md' : 'text-blue-300 hover:text-blue-400'}`}
+                  >
+                    {size === 'S' ? t.fontSizeS : size === 'M' ? t.fontSizeM : t.fontSizeL}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Card layout */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-blue-100 rounded-xl">
+                  <Squares2X2Icon className="w-5 h-5 text-blue-600" />
+                </div>
+                <p className="font-black text-blue-900 text-sm">{t.cardLayoutLabel}</p>
+              </div>
+              <div className="flex bg-blue-50/50 p-2 rounded-[2rem] border-4 border-blue-50">
+                <button
+                  onClick={() => setTempSettings({ ...tempSettings, cardLayout: 'grid' })}
+                  className={`flex-1 py-2.5 rounded-[1.5rem] font-black transition-all text-sm flex items-center justify-center gap-2 ${(tempSettings.cardLayout ?? 'list') === 'grid' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-300 hover:text-blue-400'}`}
+                >
+                  <Squares2X2Icon className="w-4 h-4" /> {t.cardLayoutGrid}
+                </button>
+                <button
+                  onClick={() => setTempSettings({ ...tempSettings, cardLayout: 'list' })}
+                  className={`flex-1 py-2.5 rounded-[1.5rem] font-black transition-all text-sm flex items-center justify-center gap-2 ${(tempSettings.cardLayout ?? 'list') === 'list' ? 'bg-white text-blue-600 shadow-md' : 'text-blue-300 hover:text-blue-400'}`}
+                >
+                  <Bars3Icon className="w-4 h-4" /> {t.cardLayoutList}
+                </button>
+              </div>
+            </div>
+
+            {/* Focus mode */}
+            <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500 rounded-xl">
+                  <LockClosedIcon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-black text-indigo-900 text-sm">{t.focusMode}</p>
+                  <p className="text-xs text-indigo-400 font-bold">{t.focusModeDesc}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => onOpenFocusMode?.()}
+                className="px-3 py-2 bg-indigo-500 text-white font-black rounded-xl text-xs active:scale-95 transition-all"
+              >
+                {t.focusModeStart}
+              </button>
             </div>
           </section>
 

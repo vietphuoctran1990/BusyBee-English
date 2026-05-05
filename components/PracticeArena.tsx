@@ -11,11 +11,44 @@ interface PracticeArenaProps {
   allItems: LearningItem[];
   onExit: (results?: { itemId: string; success: boolean }[], starsEarned?: number) => void;
   lang: LanguageType;
+  starsMultiplier?: number; // 2 for daily challenge bonus
 }
 
-const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems, onExit, lang }) => {
+// Haptic feedback helper
+const haptic = (pattern: number | number[]) => {
+  try { navigator.vibrate?.(pattern); } catch {}
+};
+
+// SM-2 spaced repetition update
+function applySM2(item: LearningItem, correct: boolean): Partial<LearningItem> {
+  const easeFactor = item.srsEaseFactor ?? 2.5;
+  let interval = item.srsInterval ?? 0;
+  let newEase = easeFactor;
+  let newInterval: number;
+  if (correct) {
+    if (interval === 0) newInterval = 1;
+    else if (interval === 1) newInterval = 6;
+    else newInterval = Math.round(interval * easeFactor);
+    newEase = Math.min(3.0, easeFactor + 0.1);
+  } else {
+    newInterval = 1;
+    newEase = Math.max(1.3, easeFactor - 0.2);
+  }
+  return {
+    srsInterval: newInterval,
+    srsEaseFactor: newEase,
+    srsNextReview: Date.now() + newInterval * 86_400_000,
+    proficiency: correct
+      ? Math.min(100, (item.proficiency ?? 0) + 10)
+      : Math.max(0, (item.proficiency ?? 0) - 10),
+    updatedAt: Date.now(),
+  };
+}
+
+const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems, onExit, lang, starsMultiplier = 1 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [srsUpdates, setSrsUpdates] = useState<{ itemId: string; update: Partial<LearningItem> }[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   const [feedback, setFeedback] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [shuffledOptions, setShuffledOptions] = useState<LearningItem[]>([]);
@@ -129,12 +162,21 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
     if (isTransitioning.current || feedback === 'correct') return;
     isTransitioning.current = true;
 
+    // Record SRS update
+    if (currentItem) {
+      const update = applySM2(currentItem, success);
+      setSrsUpdates(prev => [...prev, { itemId: currentItem.id, update }]);
+    }
+
     if (success) {
       setScore(s => s + 1);
       playSFX('star');
+      haptic([30, 20, 80]);
       setFeedback('correct');
     } else {
       playSFX('click');
+      haptic(100);
+      setFeedback('incorrect');
     }
 
     setTimeout(() => {
@@ -158,7 +200,9 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
   };
 
   if (isFinished) {
-    const stars = Math.ceil(score / 2);
+    const baseStars = Math.ceil(score / 2);
+    const stars = baseStars * starsMultiplier;
+    const results = srsUpdates.map(u => ({ itemId: u.itemId, success: (u.update.proficiency ?? 0) > 0, srsUpdate: u.update }));
     return (
       <div className="fixed inset-0 bg-[#F0F9FF] flex flex-col items-center justify-center p-6 text-center animate-scale-up z-[200] safe-inset">
         <TrophyIcon className="w-20 h-20 sm:w-28 sm:h-28 md:w-40 md:h-40 text-yellow-400 mb-4 md:mb-6 animate-bounce" />
@@ -167,9 +211,10 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
         <div className="clay-card p-5 md:p-10 bg-yellow-50 flex items-center gap-4 md:gap-6 mb-8 animate-float mx-auto shadow-xl">
           <StarIcon className="w-8 h-8 md:w-14 md:h-14 text-yellow-500" />
           <span className="text-xl md:text-4xl font-black text-yellow-700">+{stars} {t.stars}!</span>
+          {starsMultiplier > 1 && <span className="text-sm font-black text-orange-500 bg-orange-100 px-2 py-1 rounded-xl">x{starsMultiplier}</span>}
         </div>
         <button
-          onClick={() => onExit([], stars)}
+          onClick={() => onExit(results as any, stars)}
           className="px-8 py-4 md:px-16 md:py-6 clay-button clay-indigo text-white font-black text-lg md:text-2xl shadow-2xl transition-transform hover:scale-105 active:scale-95"
         >
           Xong rồi! 🚀

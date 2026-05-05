@@ -77,6 +77,22 @@ export const generateCardDetails = async (text: string, accent: AccentType = 'US
   });
 };
 
+export const generateWordFamilies = async (word: string): Promise<string[]> => {
+  return withRetry(async () => {
+    const ai = getSafeClient();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Give 3-4 related word forms for "${word}" (e.g. for "happy": ["happiness","happily","unhappy"]). Only single English words, kids-appropriate. JSON array only.`,
+      config: {
+        ...FAST_CONFIG,
+        responseMimeType: "application/json",
+        responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  }).catch(() => []);
+};
+
 export const suggestTopics = async (text: string): Promise<string[]> => {
   return withRetry(async () => {
     const ai = getSafeClient();

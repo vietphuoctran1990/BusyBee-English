@@ -108,6 +108,7 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
           <img
             src={`data:image/jpeg;base64,${item.imageUrl}`}
             alt={item.text}
+            loading="lazy"
             className="w-full h-full object-cover animate-fade-in transition-transform duration-700 group-hover:scale-110"
             onClick={(e) => { e.stopPropagation(); onZoom(`data:image/jpeg;base64,${item.imageUrl}`); }}
           />
@@ -165,6 +166,20 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
             ? <ArrowPathIcon className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
             : <><SpeakerWaveIcon className="w-5 h-5 md:w-6 md:h-6" /><span>{t.listen}</span></>}
         </button>
+
+        {/* Word families */}
+        {item.wordFamilies && item.wordFamilies.length > 0 && !item.loading && (
+          <div className="mt-2 flex flex-wrap gap-1 justify-center">
+            {item.wordFamilies.slice(0, 4).map((w, i) => (
+              <span
+                key={i}
+                className="text-[10px] font-black text-indigo-400 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg"
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

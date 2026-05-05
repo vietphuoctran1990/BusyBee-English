@@ -209,6 +209,76 @@ export const TRANSLATIONS = {
     notifEnable: "Enable Reminder",
     notifDisable: "Disable Reminder",
     notifTimeLabel: "Reminder Time",
+    // Font size
+    fontSizeLabel: "Text Size",
+    fontSizeS: "Small",
+    fontSizeM: "Medium",
+    fontSizeL: "Large",
+    // Dark mode
+    darkModeLabel: "Dark Mode",
+    darkModeOn: "On",
+    darkModeOff: "Off",
+    // Card layout
+    cardLayoutLabel: "Card Layout",
+    cardLayoutGrid: "Grid",
+    cardLayoutList: "List",
+    // Display settings section
+    displaySection: "Display",
+    // Quick Quiz
+    quickQuiz: "Quick Quiz",
+    quickQuizDesc: "5 quick questions from your collection",
+    quickQuizStart: "Start Quiz",
+    quickQuizResult: "Quiz Complete!",
+    // Daily Challenge
+    dailyChallenge: "Daily Challenge",
+    dailyChallengeDesc: "Review 5 cards for 2x stars!",
+    dailyChallengeComplete: "Challenge done! 🎉",
+    dailyChallengeClaim: "Claim 2x Stars!",
+    dailyChallengeBonus: "Bonus Stars Earned!",
+    dailyChallengeAlreadyDone: "Come back tomorrow!",
+    // Streak shield
+    streakShield: "Streak Shield",
+    streakShieldDesc: "Protects your streak for 1 day",
+    streakShieldCount: "Shields",
+    // Milestone
+    milestone7: "7-Day Streak! 🔥",
+    milestone30: "30-Day Streak! 🏆",
+    milestone100: "100-Day Streak! 👑",
+    milestoneReward: "Special Pokemon unlocked!",
+    // SRS
+    reviewToday: "Review Today",
+    reviewDue: "due",
+    // Progress Stats
+    statsScreen: "My Progress",
+    statsWeekly: "This Week",
+    statsAllTime: "All Time",
+    statsByTopic: "By Topic",
+    statsCardsPerDay: "Cards / Day",
+    statsStreak: "Best Streak",
+    statsReviewAccuracy: "Accuracy",
+    statsNoData: "Start practicing to see your stats!",
+    // Flip card
+    flipCard: "Flip Card",
+    flipCardMode: "Flip Mode",
+    slideshowMode: "Slideshow",
+    // Word families
+    wordFamilies: "Word Family",
+    // Focus mode
+    focusMode: "Focus Mode",
+    focusModeDesc: "Lock to practice — no distractions",
+    focusModePin: "Set PIN (4 digits)",
+    focusModeEnter: "Enter PIN to exit",
+    focusModeStart: "Start Focus Mode",
+    focusModeWrongPin: "Wrong PIN, try again",
+    // Pull to refresh
+    pullToRefresh: "Pull to refresh",
+    releasing: "Release to refresh",
+    refreshing: "Refreshing...",
+    // Empty states
+    emptyStoriesTitle: "No stories yet!",
+    emptyStoriesDesc: "Go to Collection, select words, and tap Magic Story.",
+    emptyPracticeTitle: "Nothing to practice!",
+    emptyPracticeDesc: "Save at least 2 cards to start a practice game.",
   },
   vn: {
     welcome: "Chào mừng bé đến với Busy Bee English!",
@@ -419,5 +489,75 @@ export const TRANSLATIONS = {
     notifEnable: "Bật nhắc nhở",
     notifDisable: "Tắt nhắc nhở",
     notifTimeLabel: "Giờ nhắc nhở",
+    // Font size
+    fontSizeLabel: "Cỡ chữ",
+    fontSizeS: "Nhỏ",
+    fontSizeM: "Vừa",
+    fontSizeL: "To",
+    // Dark mode
+    darkModeLabel: "Chế độ tối",
+    darkModeOn: "Bật",
+    darkModeOff: "Tắt",
+    // Card layout
+    cardLayoutLabel: "Kiểu hiển thị thẻ",
+    cardLayoutGrid: "Lưới",
+    cardLayoutList: "Danh sách",
+    // Display settings section
+    displaySection: "Hiển thị",
+    // Quick Quiz
+    quickQuiz: "Quiz Nhanh",
+    quickQuizDesc: "5 câu hỏi nhanh từ bộ sưu tập",
+    quickQuizStart: "Bắt đầu Quiz",
+    quickQuizResult: "Hoàn thành Quiz!",
+    // Daily Challenge
+    dailyChallenge: "Thử Thách Hôm Nay",
+    dailyChallengeDesc: "Ôn 5 thẻ để nhận sao x2!",
+    dailyChallengeComplete: "Hoàn thành thử thách! 🎉",
+    dailyChallengeClaim: "Nhận Sao x2!",
+    dailyChallengeBonus: "Nhận được Sao Thưởng!",
+    dailyChallengeAlreadyDone: "Hẹn gặp lại ngày mai!",
+    // Streak shield
+    streakShield: "Khiên Bảo Vệ",
+    streakShieldDesc: "Bảo vệ chuỗi học 1 ngày nếu quên",
+    streakShieldCount: "Khiên",
+    // Milestone
+    milestone7: "7 Ngày Liên Tiếp! 🔥",
+    milestone30: "30 Ngày Liên Tiếp! 🏆",
+    milestone100: "100 Ngày Liên Tiếp! 👑",
+    milestoneReward: "Mở khóa Pokemon đặc biệt!",
+    // SRS
+    reviewToday: "Ôn Hôm Nay",
+    reviewDue: "đến hạn",
+    // Progress Stats
+    statsScreen: "Tiến Độ Của Bé",
+    statsWeekly: "Tuần Này",
+    statsAllTime: "Tổng Cộng",
+    statsByTopic: "Theo Chủ Đề",
+    statsCardsPerDay: "Thẻ / Ngày",
+    statsStreak: "Streak Tốt Nhất",
+    statsReviewAccuracy: "Độ Chính Xác",
+    statsNoData: "Luyện tập để xem thống kê!",
+    // Flip card
+    flipCard: "Lật Thẻ",
+    flipCardMode: "Chế Độ Lật",
+    slideshowMode: "Trình Chiếu",
+    // Word families
+    wordFamilies: "Từ Cùng Gốc",
+    // Focus mode
+    focusMode: "Chế Độ Tập Trung",
+    focusModeDesc: "Khóa màn hình luyện tập — không phân tâm",
+    focusModePin: "Đặt mã PIN (4 số)",
+    focusModeEnter: "Nhập PIN để thoát",
+    focusModeStart: "Bắt Đầu Tập Trung",
+    focusModeWrongPin: "Sai PIN, thử lại nhé",
+    // Pull to refresh
+    pullToRefresh: "Kéo để làm mới",
+    releasing: "Thả để làm mới",
+    refreshing: "Đang tải...",
+    // Empty states
+    emptyStoriesTitle: "Chưa có truyện nào!",
+    emptyStoriesDesc: "Vào Bộ Sưu Tập, chọn từ vựng và nhấn Truyện Thần Kỳ.",
+    emptyPracticeTitle: "Chưa có gì để luyện tập!",
+    emptyPracticeDesc: "Lưu ít nhất 2 thẻ để bắt đầu trò chơi luyện tập.",
   }
 };

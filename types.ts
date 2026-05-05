@@ -17,8 +17,15 @@ export interface LearningItem {
   imageStyle?: 'default' | '3d-dynamic';
   error?: string;
   createdAt: number;
+  updatedAt?: number;
   isSaved?: boolean;
   proficiency?: number;
+  // SRS (Spaced Repetition System — SM-2)
+  srsInterval?: number;    // days until next review
+  srsEaseFactor?: number;  // 1.3–2.5, default 2.5
+  srsNextReview?: number;  // timestamp
+  // Word family suggestions
+  wordFamilies?: string[];
 }
 
 export interface UserProfile {
@@ -33,6 +40,9 @@ export interface UserProfile {
 export interface AppSettings {
   accent: AccentType;
   language: LanguageType;
+  fontSize?: 'S' | 'M' | 'L';
+  darkMode?: boolean;
+  cardLayout?: 'grid' | 'list';
 }
 
 export interface UserStats {
@@ -44,6 +54,11 @@ export interface UserStats {
   unlockedStickers: string[];
   streak: number;
   lastLoginDate: string;
+  streakShield?: number;       // number of shields available (max 3)
+  lastChallengeDate?: string;  // ISO date of last completed daily challenge
+  milestonesSeen?: number[];   // streak milestones already celebrated
+  // Weekly activity: array of 7 numbers (cards created per day, oldest first)
+  weeklyActivity?: number[];
 }
 
 export type GameType = 'listening' | 'speaking' | 'spelling';
