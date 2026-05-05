@@ -116,10 +116,20 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCloudTsRef = useRef<number>(0);
-  const lastPushTsRef = useRef<number>(0);
+  const lastPushAtRef = useRef<number>(0); // local Date.now() when we last pushed
+
+  // Refs always reflect current state — safe to read inside setTimeout/setInterval
+  const itemsRef = useRef<LearningItem[]>([]);
+  const storiesRef = useRef<StoryData[]>([]);
+  const statsRef = useRef<UserStats>(stats);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
+
+  // Keep refs in sync with state so callbacks always read fresh values
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { storiesRef.current = stories; }, [stories]);
+  useEffect(() => { statsRef.current = stats; }, [stats]);
   const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showGlobalError = useCallback((msg: string) => {
@@ -128,15 +138,40 @@ const App: React.FC = () => {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
 
-  // Apply cloud snapshot to local state (shared by initial load + polling)
-  const applyCloudData = useCallback((cloud: Awaited<ReturnType<typeof downloadData>>) => {
+  // Merge cloud snapshot into local state — never deletes local-only items
+  const mergeCloudData = useCallback((cloud: Awaited<ReturnType<typeof downloadData>>) => {
     if (!cloud.updatedAt) return;
     lastCloudTsRef.current = cloud.updatedAt;
+
     if (cloud.items.length) {
-      setItems(cloud.items);
-      saveItemsToDB(cloud.items).catch(() => {});
+      setItems(localItems => {
+        const cloudMap = new Map(cloud.items.map(i => [i.id, i]));
+        const localIds = new Set(localItems.map(i => i.id));
+        // For duplicates: use whichever has newer updatedAt/createdAt
+        const merged = localItems.map(local => {
+          const cloudItem = cloudMap.get(local.id);
+          if (!cloudItem) return local;
+          const localTs = (local as any).updatedAt || local.createdAt || 0;
+          const cloudTs2 = (cloudItem as any).updatedAt || cloudItem.createdAt || 0;
+          return cloudTs2 >= localTs ? cloudItem : local;
+        });
+        // Add cloud-only items not present locally
+        const cloudOnly = cloud.items.filter(i => !localIds.has(i.id));
+        const result = [...merged, ...cloudOnly].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        saveItemsToDB(result).catch(() => {});
+        return result;
+      });
     }
-    if (cloud.stories.length) setStories(cloud.stories);
+
+    if (cloud.stories.length) {
+      setStories(localStories => {
+        const cloudMap = new Map(cloud.stories.map(s => [s.id, s]));
+        const localIds = new Set(localStories.map(s => s.id));
+        const cloudOnly = cloud.stories.filter(s => !localIds.has(s.id));
+        return [...localStories.map(s => cloudMap.get(s.id) || s), ...cloudOnly];
+      });
+    }
+
     if (cloud.stats) {
       setStats(prev => ({
         ...prev,
@@ -150,9 +185,9 @@ const App: React.FC = () => {
         ])),
       }));
     }
-  }, []); // eslint-disable-line
+  }, []);
 
-  // On login: load IndexedDB then pull cloud — MERGE both to avoid data loss
+  // On login: load IndexedDB then merge cloud data
   useEffect(() => {
     if (!currentUser) return;
     Promise.all([
@@ -165,68 +200,53 @@ const App: React.FC = () => {
       downloadData(syncCode).then(cloud => {
         setIsSyncing(false);
         if (cloud.items.length || cloud.stories.length) {
-          // Merge: cloud version wins for duplicates, but keep local-only items
+          mergeCloudData(cloud);
+
+          // If local had items cloud didn't know about, push merged set up after merge settles
           const cloudItemIds = new Set(cloud.items.map(i => i.id));
-          const localOnlyItems = localItems.filter(i => !cloudItemIds.has(i.id));
-          const mergedItems = [...cloud.items, ...localOnlyItems]
-            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
           const cloudStoryIds = new Set(cloud.stories.map(s => s.id));
-          const localOnlyStories = localStories.filter(s => !cloudStoryIds.has(s.id));
-          const mergedStories = [...cloud.stories, ...localOnlyStories];
-
-          setItems(mergedItems);
-          setStories(mergedStories);
-          saveItemsToDB(mergedItems).catch(() => {});
-          lastCloudTsRef.current = cloud.updatedAt || 0;
-
-          // If local had items cloud didn't know about, push merged set up
-          if (localOnlyItems.length > 0 || localOnlyStories.length > 0) {
-            uploadData(syncCode, { items: mergedItems, stories: mergedStories, stats: null })
-              .then(() => { lastPushTsRef.current = Date.now(); })
-              .catch(() => {});
-          }
-
-          if (cloud.stats) {
-            setStats(prev => ({
-              ...prev,
-              stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
-              cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
-              streak: cloud.stats!.streak || prev.streak || 0,
-              lastLoginDate: cloud.stats!.lastLoginDate || prev.lastLoginDate || '',
-              unlockedStickers: Array.from(new Set([
-                ...(prev.unlockedStickers || []),
-                ...(cloud.stats!.unlockedStickers || []),
-              ])),
-            }));
+          const hasLocalOnly = localItems.some(i => !cloudItemIds.has(i.id))
+            || localStories.some(s => !cloudStoryIds.has(s.id));
+          if (hasLocalOnly) {
+            setTimeout(() => {
+              uploadData(syncCode, {
+                items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+                stories: storiesRef.current,
+                stats: statsRef.current,
+              }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
+            }, 500);
           }
         } else if (localItems.length) {
           // Cloud empty — push all local data up
-          uploadData(syncCode, { items: localItems, stories: localStories, stats: null })
-            .then(() => { lastPushTsRef.current = Date.now(); })
-            .catch(() => {});
+          uploadData(syncCode, {
+            items: localItems.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+            stories: localStories,
+            stats: statsRef.current,
+          }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
         }
       }).catch(() => setIsSyncing(false));
     });
   }, [currentUser]); // eslint-disable-line
 
-  // Poll every 10s — apply cloud data only if newer than last known
+  // Poll every 10s — merge cloud data only if it's newer than what we've seen
   useEffect(() => {
     if (!currentUser) return;
     const poll = async () => {
       try {
         const cloud = await downloadData(syncCode);
         const cloudTs = cloud.updatedAt || 0;
-        // Skip if: no data, same as last received, or we just pushed this ourselves
-        if (!cloudTs || cloudTs <= lastCloudTsRef.current || cloudTs === lastPushTsRef.current) return;
+        // Skip if no data or not newer than last received
+        if (!cloudTs || cloudTs <= lastCloudTsRef.current) return;
+        // Skip if we pushed recently (within 5s) — this is our own echo
+        if (Date.now() - lastPushAtRef.current < 5000) return;
         setIsSyncing(true);
-        applyCloudData(cloud);
+        mergeCloudData(cloud);
         setTimeout(() => setIsSyncing(false), 600);
       } catch {}
     };
     const timer = setInterval(poll, 10000);
     return () => clearInterval(timer);
-  }, [currentUser, syncCode, applyCloudData]);
+  }, [currentUser, syncCode, mergeCloudData]);
 
   // Streak calculation
   useEffect(() => {
@@ -316,26 +336,17 @@ const App: React.FC = () => {
     } catch {}
   };
 
-  // Debounced cloud push — called after any data change
-  const scheduleCloudPush = useCallback((overrideItems?: LearningItem[], overrideStories?: StoryData[]) => {
+  // Debounced cloud push — reads from refs so no stale closure issues
+  const scheduleCloudPush = useCallback(() => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(() => {
-      setItems(currentItems => {
-        setStories(currentStories => {
-          setStats(currentStats => {
-            uploadData(syncCode, {
-              items: (overrideItems ?? currentItems).map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
-              stories: overrideStories ?? currentStories,
-              stats: currentStats,
-            }).then(() => { lastPushTsRef.current = Date.now(); }).catch(() => {});
-            return currentStats;
-          });
-          return currentStories;
-        });
-        return currentItems;
-      });
+      uploadData(syncCode, {
+        items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+        stories: storiesRef.current,
+        stats: statsRef.current,
+      }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
     }, 1000);
-  }, [syncCode]); // eslint-disable-line
+  }, [syncCode]);
 
   useEffect(() => {
     try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {}
@@ -522,7 +533,7 @@ const App: React.FC = () => {
     setItems(importedItems);
     saveItemsToDB(importedItems);
     if (data.stories) setStories(data.stories);
-    scheduleCloudPush(importedItems, data.stories);
+    scheduleCloudPush();
     playSFX('success');
   };
 
@@ -532,21 +543,13 @@ const App: React.FC = () => {
     if (status === 'error') return { success: false, errorType: 'firebase_error' };
     if (status === 'not_found') return { success: false, errorType: 'not_found' };
     const cloud = await downloadData(upperCode);
-    if (cloud.items.length) {
-      setItems(cloud.items);
-      await saveItemsToDB(cloud.items);
-    }
-    if (cloud.stories.length) setStories(cloud.stories);
-    if (cloud.stats) {
-      setStats(prev => ({
-        ...prev,
-        stars: Math.max(prev.stars || 0, cloud.stats!.stars || 0),
-        cardsCreated: Math.max(prev.cardsCreated || 0, cloud.stats!.cardsCreated || 0),
-        unlockedStickers: Array.from(new Set([...(prev.unlockedStickers || []), ...(cloud.stats!.unlockedStickers || [])])),
-      }));
-    }
+    // Switch to the new code first so subsequent pushes use it
     setSyncCode(upperCode);
     try { localStorage.setItem(SYNC_KEY, upperCode); } catch {}
+    // Merge cloud data — don't overwrite local-only items
+    if (cloud.updatedAt) {
+      mergeCloudData(cloud);
+    }
     return { success: true };
   };
 
@@ -609,10 +612,11 @@ const App: React.FC = () => {
           isSyncing={isSyncing}
           onSyncNow={async () => {
             const ok = await uploadData(syncCode, {
-              items: items.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
-              stories,
-              stats,
+              items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
+              stories: storiesRef.current,
+              stats: statsRef.current,
             });
+            if (ok) lastPushAtRef.current = Date.now();
             return ok;
           }}
           onLinkCode={handleLinkCode}
