@@ -57,6 +57,8 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('generativelanguage') ||
       event.request.url.includes('firestore') ||
       event.request.url.includes('googleapis')) return;
+  // version.json must always be fresh — never serve from cache
+  if (event.request.url.includes('version.json')) return;
 
   event.respondWith(
     fetch(event.request)
@@ -102,6 +104,10 @@ self.addEventListener('message', (event) => {
       clearTimeout(reminderTimer);
       reminderTimer = null;
     }
+  }
+
+  if (type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 

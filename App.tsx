@@ -154,6 +154,11 @@ const App: React.FC = () => {
   const [showDeckManager, setShowDeckManager] = useState(false);
   const [activeDeck, setActiveDeck] = useState<string | null>(null);
 
+  // App update detection
+  const [showUpdateToast, setShowUpdateToast] = useState(false);
+  const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
+  const knownBuildTime = useRef<string>(typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '');
+
   // Sync code — stable ID shared across devices
   const [syncCode, setSyncCode] = useState<string>(() => {
     try {
@@ -429,6 +434,34 @@ const App: React.FC = () => {
       }
     }
   }, [stats.streak]); // eslint-disable-line
+
+  // SW update event — fired from index.html when new SW is waiting
+  useEffect(() => {
+    const onSwUpdate = (e: Event) => {
+      swRegRef.current = (e as CustomEvent).detail as ServiceWorkerRegistration;
+      setShowUpdateToast(true);
+    };
+    window.addEventListener('swUpdateReady', onSwUpdate);
+    return () => window.removeEventListener('swUpdateReady', onSwUpdate);
+  }, []);
+
+  // Version polling — fetch /version.json every 5 min and compare buildTime
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const data: { buildTime: string } = await res.json();
+        if (data.buildTime && knownBuildTime.current && data.buildTime !== knownBuildTime.current) {
+          setShowUpdateToast(true);
+        }
+      } catch {}
+    };
+    // First check after 30s (give app time to fully load), then every 5 min
+    const initial = setTimeout(checkVersion, 30_000);
+    const interval = setInterval(checkVersion, 5 * 60_000);
+    return () => { clearTimeout(initial); clearInterval(interval); };
+  }, []);
 
   // Milestone toasts: 7, 30, 100 days
   useEffect(() => {
@@ -777,6 +810,38 @@ const App: React.FC = () => {
           <div className={`flex items-center gap-2 bg-blue-500 text-white text-xs font-black px-4 py-2 rounded-full shadow-lg transition-all ${isRefreshing ? 'animate-pulse' : ''}`}>
             <ArrowPathIcon className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? t.refreshing : pullY >= PULL_THRESHOLD ? t.releasing : t.pullToRefresh}
+          </div>
+        </div>
+      )}
+
+      {/* ── App update toast ── */}
+      {showUpdateToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[400] animate-scale-up w-[92%] max-w-sm">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-blue-400">
+            <span className="text-2xl shrink-0">🚀</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm leading-tight">
+                {settings.language === 'vn' ? 'Có phiên bản mới!' : 'New version available!'}
+              </p>
+              <p className="text-blue-200 text-xs font-bold">
+                {settings.language === 'vn' ? 'Nhấn để tải cập nhật' : 'Tap to reload & update'}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (swRegRef.current?.waiting) {
+                  swRegRef.current.waiting.postMessage({ type: 'SKIP_WAITING' });
+                } else {
+                  window.location.reload();
+                }
+              }}
+              className="shrink-0 px-4 py-2 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 active:scale-95 transition-all shadow-md"
+            >
+              {settings.language === 'vn' ? 'Cập nhật' : 'Update'}
+            </button>
+            <button onClick={() => setShowUpdateToast(false)} className="shrink-0 p-1 hover:bg-white/20 rounded-lg transition-all">
+              <XMarkIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

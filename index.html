@@ -34,11 +34,33 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- Register Service Worker -->
+    <!-- Register Service Worker + update detection -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            // If a new SW is already waiting when page loads
+            if (reg.waiting) {
+              window.dispatchEvent(new CustomEvent('swUpdateReady', { detail: reg }));
+            }
+            // Watch for new SW installing
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', () => {
+                // New SW installed and waiting — an existing SW controls the page
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(new CustomEvent('swUpdateReady', { detail: reg }));
+                }
+              });
+            });
+          }).catch(() => {});
+
+          // When the controller changes (after skipWaiting), reload once
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) { refreshing = true; window.location.reload(); }
+          });
         });
       }
     </script>
