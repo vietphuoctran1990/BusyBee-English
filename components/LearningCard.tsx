@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { SpeakerWaveIcon, TrashIcon, HeartIcon as HeartIconSolid, ArrowPathIcon, LanguageIcon, PencilSquareIcon, ExclamationCircleIcon, PhotoIcon } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartIconOutline } from '@heroicons/react/24/outline';
 import { LearningItem, LanguageType, AccentType } from '../types';
@@ -22,11 +22,13 @@ interface LearningCardProps {
 const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, onToggleSave, onRegenerateImage, onRegenerateAudio, onZoom, onEdit, lang, accent }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const isPlayingRef = useRef(false);
   const t = TRANSLATIONS[lang];
 
   const handlePlay = useCallback(async (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!item.text || isPlaying) return;
+    if (!item.text || isPlayingRef.current) return;
+    isPlayingRef.current = true;
     setIsPlaying(true);
     try {
       if (item.audioBase64) {
@@ -39,8 +41,9 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
     } catch {
       await speakWithBrowser(item.text, 'en', { rate: 1.0, accent });
     }
+    isPlayingRef.current = false;
     setIsPlaying(false);
-  }, [item.text, item.audioBase64, accent, isPlaying]);
+  }, [item.text, item.audioBase64, accent]);
 
   const toggleTranslate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -106,11 +109,11 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
           </div>
         ) : item.imageUrl ? (
           <img
-            src={`data:image/jpeg;base64,${item.imageUrl}`}
+            src={`data:image/png;base64,${item.imageUrl}`}
             alt={item.text}
             loading="lazy"
             className="w-full h-full object-cover animate-fade-in transition-transform duration-700 group-hover:scale-110"
-            onClick={(e) => { e.stopPropagation(); onZoom(`data:image/jpeg;base64,${item.imageUrl}`); }}
+            onClick={(e) => { e.stopPropagation(); onZoom(`data:image/png;base64,${item.imageUrl}`); }}
           />
         ) : item.error ? (
           <div className="flex flex-col items-center justify-center p-4 text-center">

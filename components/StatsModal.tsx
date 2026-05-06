@@ -11,12 +11,21 @@ interface StatsModalProps {
   onClose: () => void;
 }
 
-const DAY_LABELS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DAY_LABELS_VN = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_VN = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
 const StatsModal: React.FC<StatsModalProps> = ({ stats, items, lang, onClose }) => {
   const t = TRANSLATIONS[lang];
-  const dayLabels = lang === 'vn' ? DAY_LABELS_VN : DAY_LABELS_EN;
+
+  // Build labels for last 7 days based on actual weekdays (index 6 = today)
+  const dayLabels = useMemo(() => {
+    const labels = lang === 'vn' ? DAYS_VN : DAYS_EN;
+    const todayDow = new Date().getDay(); // 0=Sun
+    return Array.from({ length: 7 }, (_, i) => {
+      const dow = (todayDow - (6 - i) + 7) % 7;
+      return labels[dow];
+    });
+  }, [lang]);
 
   // Weekly activity — last 7 days
   const weeklyActivity = useMemo(() => {

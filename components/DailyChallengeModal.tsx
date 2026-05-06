@@ -92,7 +92,7 @@ const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
                     >
                       {item.imageUrl ? (
                         <img
-                          src={`data:image/jpeg;base64,${item.imageUrl}`}
+                          src={`data:image/png;base64,${item.imageUrl}`}
                           className="w-full h-full object-cover"
                           loading="lazy"
                           alt=""

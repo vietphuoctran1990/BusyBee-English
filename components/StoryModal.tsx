@@ -187,7 +187,7 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
                     <div className="w-full h-full p-2.5 md:p-5 flex items-center justify-center">
                         {sceneImages[currentSceneIndex] ? (
                             <img 
-                                src={sceneImages[currentSceneIndex].startsWith('data:') ? sceneImages[currentSceneIndex] : `data:image/jpeg;base64,${sceneImages[currentSceneIndex]}`} 
+                                src={sceneImages[currentSceneIndex].startsWith('data:') ? sceneImages[currentSceneIndex] : `data:image/png;base64,${sceneImages[currentSceneIndex]}`} 
                                 className="w-full h-full object-contain rounded-lg md:rounded-[1.2rem] shadow-md animate-fade-in transition-all duration-700" 
                                 alt="scene" 
                             />

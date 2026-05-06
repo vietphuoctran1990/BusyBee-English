@@ -25,12 +25,17 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [beeMood, setBeeMood] = useState<BeeMood>('idle');
   const beeMoodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiMsgCount = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatSessionRef = useRef<Chat | null>(null);
 
   const t = TRANSLATIONS[lang];
   const friendName = userProfile.gender === 'girl' ? 'Magic Bluey' : 'Robo Friend';
-  const avatarEmoji = userProfile.gender === 'girl' ? '🦄' : '🤖';
+
+  // Cleanup bee mood timer on unmount
+  useEffect(() => {
+    return () => { if (beeMoodTimer.current) clearTimeout(beeMoodTimer.current); };
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -84,7 +89,8 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
         }
         const result = await chatSessionRef.current.sendMessage({ message: userText });
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: result.text || "✨", timestamp: Date.now() }]);
-        if (onReward && messages.length % 5 === 0) onReward(2);
+        aiMsgCount.current += 1;
+        if (onReward && aiMsgCount.current % 5 === 0) onReward(2);
         playSFX('pop');
         setBeeFor('happy', 2500);
     } catch (e) {

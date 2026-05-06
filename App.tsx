@@ -447,6 +447,7 @@ const App: React.FC = () => {
 
   // Version polling — fetch /version.json every 5 min and compare buildTime
   useEffect(() => {
+    if (!currentUser) return; // only poll when logged in
     const checkVersion = async () => {
       try {
         const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -461,7 +462,7 @@ const App: React.FC = () => {
     const initial = setTimeout(checkVersion, 30_000);
     const interval = setInterval(checkVersion, 5 * 60_000);
     return () => { clearTimeout(initial); clearInterval(interval); };
-  }, []);
+  }, [currentUser]);
 
   // Milestone toasts: 7, 30, 100 days
   useEffect(() => {
@@ -1434,7 +1435,7 @@ const App: React.FC = () => {
                           </button>
                           <div className="aspect-video bg-indigo-50 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden flex items-center justify-center shadow-inner">
                             {story.scenes[0].imageUrl ? (
-                              <img src={story.scenes[0].imageUrl.startsWith('data:') ? story.scenes[0].imageUrl : `data:image/jpeg;base64,${story.scenes[0].imageUrl}`} className="w-full h-full object-cover" />
+                              <img src={story.scenes[0].imageUrl.startsWith('data:') ? story.scenes[0].imageUrl : `data:image/png;base64,${story.scenes[0].imageUrl}`} className="w-full h-full object-cover" />
                             ) : <BookOpenIcon className="w-16 h-16 md:w-20 md:h-20 text-indigo-200" />}
                           </div>
                           <div className="space-y-2">

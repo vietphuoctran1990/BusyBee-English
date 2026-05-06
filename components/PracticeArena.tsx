@@ -63,6 +63,11 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
   const [beeMood, setBeeMood] = useState<BeeMood>('idle');
   const beeMoodTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  // Cleanup bee mood timers on unmount
+  useEffect(() => {
+    return () => { beeMoodTimers.current.forEach(clearTimeout); };
+  }, []);
+
   const isTransitioning = useRef(false);
 
   const calcSimilarity = (a: string, b: string): number => {
@@ -333,7 +338,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
                     }`}
                   >
                     {opt.imageUrl ? (
-                      <img src={`data:image/jpeg;base64,${opt.imageUrl}`} className="w-full h-full object-contain rounded-xl md:rounded-[2rem]" alt="option" />
+                      <img src={`data:image/png;base64,${opt.imageUrl}`} className="w-full h-full object-contain rounded-xl md:rounded-[2rem]" alt="option" />
                     ) : (
                       <div className="text-4xl sm:text-5xl md:text-7xl">{opt.emoji || '?'}</div>
                     )}
@@ -354,7 +359,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
               {/* Image */}
               <div className="w-full max-w-[180px] sm:max-w-[220px] md:max-w-[300px] lg:max-w-[380px] aspect-square clay-card p-3 md:p-6 flex items-center justify-center bg-indigo-50 border-white shadow-lg shrink-0 mx-auto md:mx-0">
                 {currentItem.imageUrl
-                  ? <img src={`data:image/jpeg;base64,${currentItem.imageUrl}`} className="w-full h-full object-contain" alt="spelling" />
+                  ? <img src={`data:image/png;base64,${currentItem.imageUrl}`} className="w-full h-full object-contain" alt="spelling" />
                   : <div className="text-6xl sm:text-7xl md:text-9xl">{currentItem.emoji || '?'}</div>}
               </div>
 
@@ -402,7 +407,7 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
               <div className="w-full max-w-[200px] sm:max-w-[260px] md:max-w-[340px] lg:max-w-[420px] aspect-square clay-card p-3 md:p-8 flex items-center justify-center bg-indigo-50 border-white shadow-xl relative overflow-hidden shrink-0 mx-auto lg:mx-0">
                 {currentItem.imageUrl ? (
                   <img
-                    src={`data:image/jpeg;base64,${currentItem.imageUrl}`}
+                    src={`data:image/png;base64,${currentItem.imageUrl}`}
                     className={`w-full h-full object-contain transition-transform duration-700 ${feedback === 'correct' ? 'scale-110' : feedback === 'incorrect' ? 'grayscale opacity-50' : ''}`}
                     alt="speaking"
                   />

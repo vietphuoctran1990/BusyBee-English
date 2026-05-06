@@ -115,7 +115,7 @@ const SlideshowModal: React.FC<SlideshowModalProps> = ({ items, onClose, lang })
             <div className="flex-1 relative bg-gray-100 rounded-2xl overflow-hidden">
               {currentItem.imageUrl ? (
                 <img
-                  src={`data:image/jpeg;base64,${currentItem.imageUrl}`}
+                  src={`data:image/png;base64,${currentItem.imageUrl}`}
                   className="w-full h-full object-cover"
                   loading="lazy"
                   alt={currentItem.text}
@@ -157,7 +157,7 @@ const SlideshowModal: React.FC<SlideshowModalProps> = ({ items, onClose, lang })
                 <div className="flex-1 bg-indigo-50 overflow-hidden">
                   {currentItem.imageUrl ? (
                     <img
-                      src={`data:image/jpeg;base64,${currentItem.imageUrl}`}
+                      src={`data:image/png;base64,${currentItem.imageUrl}`}
                       className="w-full h-full object-cover"
                       loading="lazy"
                       alt={currentItem.text}

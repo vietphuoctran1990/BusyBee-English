@@ -97,7 +97,7 @@ const StoryCreationSetup: React.FC<StoryCreationSetupProps> = ({ savedItems, onC
             >
               <div className="relative w-full aspect-square bg-indigo-100 rounded-2xl overflow-hidden flex items-center justify-center">
                 {item.imageUrl ? (
-                  <img src={`data:image/jpeg;base64,${item.imageUrl}`} className="w-full h-full object-cover" />
+                  <img src={`data:image/png;base64,${item.imageUrl}`} className="w-full h-full object-cover" />
                 ) : <span className="text-3xl">{item.emoji || '❓'}</span>}
                 {selectedIds.has(item.id) && (
                   <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">

@@ -189,7 +189,7 @@ const QuickQuizModal: React.FC<QuickQuizModalProps> = ({ items, lang, onClose, o
                 >
                   {opt.imageUrl ? (
                     <img
-                      src={`data:image/jpeg;base64,${opt.imageUrl}`}
+                      src={`data:image/png;base64,${opt.imageUrl}`}
                       className="w-full h-full object-cover rounded-xl"
                       loading="lazy"
                       alt=""

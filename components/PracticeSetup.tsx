@@ -164,7 +164,7 @@ const PracticeSetup: React.FC<PracticeSetupProps> = ({ savedItems, onStartGame, 
                         {selectedIds.has(item.id) && <CheckCircleIcon className="w-5 h-5 text-white" />}
                     </div>
                     {item.imageUrl ? (
-                        <img src={`data:image/jpeg;base64,${item.imageUrl}`} className="w-10 h-10 rounded-lg object-cover shrink-0" alt="" />
+                        <img src={`data:image/png;base64,${item.imageUrl}`} className="w-10 h-10 rounded-lg object-cover shrink-0" alt="" />
                     ) : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-base shrink-0">🖼️</div>}
                     <div className="flex-1 min-w-0">
                         <span className="font-bold text-gray-700 block truncate text-sm">{item.text}</span>
