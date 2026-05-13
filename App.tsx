@@ -34,6 +34,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { TRANSLATIONS } from './utils/translations';
 import { playSFX } from './services/audioUtils';
+import { useSettings } from './hooks/useSettings';
+import { useStats } from './hooks/useStats';
 
 const USER_KEY = 'kidlingo_user_clay_v2';
 const STATS_KEY = 'kidlingo_stats_clay_v2';
@@ -79,13 +81,8 @@ const App: React.FC = () => {
   const [items, setItems] = useState<LearningItem[]>([]);
   const [stories, setStories] = useState<StoryData[]>([]);
 
-  const [stats, setStats] = useState<UserStats>(() => {
-    try { const s = localStorage.getItem(STATS_KEY); return s ? JSON.parse(s) : { stars: 0, cardsCreated: 0, unlockedStickers: [], streak: 0, lastLoginDate: '' } as any; } catch { return { stars: 0, cardsCreated: 0, unlockedStickers: [], streak: 0, lastLoginDate: '' } as any; }
-  });
-
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try { const s = localStorage.getItem(SETTINGS_KEY); return s ? JSON.parse(s) : { accent: 'US', language: 'vn' }; } catch { return { accent: 'US', language: 'vn' }; }
-  });
+  const { settings, setSettings } = useSettings();
+  const { stats, setStats, statsRef, milestoneToast, handleRewardStars } = useStats(currentUser, settings.language);
 
   const [view, setView] = useState<'create' | 'saved' | 'practice' | 'friend' | 'stories'>('create');
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,7 +142,6 @@ const App: React.FC = () => {
   const [showFocusSetup, setShowFocusSetup] = useState(false);
   const [focusLocked, setFocusLocked] = useState(() => isFocusModeLocked());
   const [practiceStarsMultiplier, setPracticeStarsMultiplier] = useState(1);
-  const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
 
   // Deck system
   const [decks, setDecks] = useState<Deck[]>(() => {
@@ -177,7 +173,6 @@ const App: React.FC = () => {
   // Refs always reflect current state — safe to read inside setTimeout/setInterval
   const itemsRef = useRef<LearningItem[]>([]);
   const storiesRef = useRef<StoryData[]>([]);
-  const statsRef = useRef<UserStats>(stats);
 
   const t = TRANSLATIONS[settings.language];
   const deletedItemIds = useRef<Set<string>>(new Set());
@@ -185,7 +180,6 @@ const App: React.FC = () => {
   // Keep refs in sync with state so callbacks always read fresh values
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { storiesRef.current = stories; }, [stories]);
-  useEffect(() => { statsRef.current = stats; }, [stats]);
   const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showGlobalError = useCallback((msg: string) => {
@@ -304,16 +298,6 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [currentUser, syncCode, mergeCloudData]);
 
-  // Streak calculation
-  useEffect(() => {
-    if (!currentUser) return;
-    const today = new Date().toISOString().split('T')[0];
-    if (stats.lastLoginDate === today) return;
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const newStreak = stats.lastLoginDate === yesterday ? (stats.streak || 0) + 1 : 1;
-    setStats(prev => ({ ...prev, streak: newStreak, lastLoginDate: today }));
-  }, [currentUser]); // eslint-disable-line
-
   // AI Studio key check
   useEffect(() => {
     const checkKey = async () => {
@@ -404,36 +388,7 @@ const App: React.FC = () => {
     }, 1000);
   }, [syncCode]);
 
-  useEffect(() => {
-    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch {}
-  }, [stats]);
-  useEffect(() => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }, [settings]);
   useEffect(() => { try { localStorage.setItem(DECKS_KEY, JSON.stringify(decks)); } catch {} }, [decks]);
-
-  // Apply dark mode to html element
-  useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.setAttribute('data-dark', 'true');
-    } else {
-      document.documentElement.removeAttribute('data-dark');
-    }
-  }, [settings.darkMode]);
-
-  // Apply font size to html element
-  useEffect(() => {
-    document.documentElement.setAttribute('data-font', settings.fontSize ?? 'M');
-  }, [settings.fontSize]);
-
-  // Streak shield: award 1 shield every 7 days of streak (max 3)
-  useEffect(() => {
-    if (!currentUser) return;
-    if ((stats.streak || 0) > 0 && (stats.streak! % 7 === 0)) {
-      const current = stats.streakShield ?? 0;
-      if (current < 3) {
-        setStats(prev => ({ ...prev, streakShield: Math.min(3, (prev.streakShield ?? 0) + 1) }));
-      }
-    }
-  }, [stats.streak]); // eslint-disable-line
 
   // SW update event — fired from index.html when new SW is waiting
   useEffect(() => {
@@ -464,32 +419,10 @@ const App: React.FC = () => {
     return () => { clearTimeout(initial); clearInterval(interval); };
   }, [currentUser]);
 
-  // Milestone toasts: 7, 30, 100 days
-  useEffect(() => {
-    if (!currentUser || !stats.streak) return;
-    const milestones = [7, 30, 100];
-    const seen = stats.milestonesSeen ?? [];
-    const hit = milestones.find(m => stats.streak === m && !seen.includes(m));
-    if (hit) {
-      const msg = hit === 7 ? t.milestone7 : hit === 30 ? t.milestone30 : t.milestone100;
-      setMilestoneToast(msg);
-      setStats(prev => ({ ...prev, milestonesSeen: [...(prev.milestonesSeen ?? []), hit] }));
-      playSFX('success');
-      setTimeout(() => setMilestoneToast(null), 5000);
-    }
-  }, [stats.streak]); // eslint-disable-line
-
-  const handleRewardStars = (amount: number) => {
-    setStats(prev => ({ ...prev, stars: prev.stars + amount }));
-  };
-
   const handleLogin = (profile: UserProfile, appSettings: AppSettings) => {
     setCurrentUser(profile);
     setSettings(appSettings);
-    try {
-      localStorage.setItem(USER_KEY, JSON.stringify(profile));
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
-    } catch {}
+    try { localStorage.setItem(USER_KEY, JSON.stringify(profile)); } catch {}
     setShowIntroModal(true);
     playSFX('success');
   };
@@ -1455,6 +1388,62 @@ const App: React.FC = () => {
           {/* PRACTICE TAB */}
           {view === 'practice' && (
             <div className="max-w-4xl mx-auto space-y-6">
+
+              {/* Today's Review banner */}
+              {srsReviewCount > 0 && (
+                <div className="clay-card bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-5 flex flex-col sm:flex-row sm:items-center gap-4 border-white shadow-xl animate-fade-in">
+                  <div className="flex-1">
+                    <p className="text-indigo-100 text-xs font-black uppercase tracking-widest mb-1">{settings.language === 'vn' ? 'Ôn tập hôm nay' : "Today's Review"}</p>
+                    <h3 className="text-2xl font-black mb-0.5">
+                      {srsReviewCount} {settings.language === 'vn' ? 'thẻ cần ôn' : 'cards due'}
+                    </h3>
+                    <p className="text-indigo-200 text-xs font-bold">
+                      {settings.language === 'vn' ? 'Hệ thống SRS đề xuất ôn những thẻ này hôm nay' : 'SRS system recommends reviewing these today'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const dueItems = items
+                        .filter(i => i.isSaved && !i.loading && (!i.srsNextReview || i.srsNextReview <= Date.now()))
+                        .sort(() => 0.5 - Math.random())
+                        .slice(0, 10);
+                      if (dueItems.length > 0) {
+                        setPracticeGame({ active: true, items: dueItems, type: 'listening' });
+                        playSFX('click');
+                      }
+                    }}
+                    className="px-6 py-3 bg-white text-indigo-600 font-black rounded-2xl shadow-lg hover:bg-indigo-50 active:scale-95 transition-all text-sm whitespace-nowrap"
+                  >
+                    {settings.language === 'vn' ? 'Ôn ngay →' : 'Review now →'}
+                  </button>
+                </div>
+              )}
+
+              {/* Streak + stats row */}
+              <div className="flex gap-3 flex-wrap">
+                <div className="clay-card flex items-center gap-3 px-4 py-3 bg-orange-50 border-orange-100 shadow-sm">
+                  <span className="text-2xl">🔥</span>
+                  <div>
+                    <p className="font-black text-orange-700 text-lg leading-none">{stats.streak ?? 0}</p>
+                    <p className="text-orange-400 text-xs font-bold">{settings.language === 'vn' ? 'ngày liên tiếp' : 'day streak'}</p>
+                  </div>
+                </div>
+                <div className="clay-card flex items-center gap-3 px-4 py-3 bg-yellow-50 border-yellow-100 shadow-sm">
+                  <StarIcon className="w-6 h-6 text-yellow-500" />
+                  <div>
+                    <p className="font-black text-yellow-700 text-lg leading-none">{stats.stars ?? 0}</p>
+                    <p className="text-yellow-400 text-xs font-bold">{settings.language === 'vn' ? 'ngôi sao' : 'stars'}</p>
+                  </div>
+                </div>
+                <div className="clay-card flex items-center gap-3 px-4 py-3 bg-blue-50 border-blue-100 shadow-sm">
+                  <BookOpenIcon className="w-6 h-6 text-blue-500" />
+                  <div>
+                    <p className="font-black text-blue-700 text-lg leading-none">{items.filter(i => i.isSaved && (i.proficiency ?? 0) >= 80).length}</p>
+                    <p className="text-blue-400 text-xs font-bold">{settings.language === 'vn' ? 'từ thành thạo' : 'mastered'}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Quick action row */}
               <div className="flex flex-wrap gap-3">
                 <button

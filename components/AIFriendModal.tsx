@@ -130,16 +130,21 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
 
         <div className="flex bg-indigo-50/50 p-1 md:p-2 border-b border-indigo-100 shrink-0">
             {[
-              { id: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon },
-              { id: 'voice', label: 'Gọi thoại', icon: MicrophoneIcon },
-              { id: 'video', label: 'Video', icon: VideoCameraIcon },
+              { id: 'chat', label: 'Chat', icon: ChatBubbleLeftRightIcon, comingSoon: false },
+              { id: 'voice', label: 'Gọi thoại', icon: MicrophoneIcon, comingSoon: true },
+              { id: 'video', label: 'Video', icon: VideoCameraIcon, comingSoon: true },
             ].map(m => (
-              <button 
+              <button
                 key={m.id}
-                onClick={() => setMode(m.id as any)} 
-                className={`flex-1 py-3 md:py-4 font-black text-xs md:text-sm flex flex-col items-center gap-1 transition-all rounded-2xl ${mode === m.id ? 'text-indigo-600 bg-white shadow-sm scale-105' : 'text-indigo-300'}`}
+                onClick={() => !m.comingSoon && setMode(m.id as any)}
+                disabled={m.comingSoon}
+                className={`flex-1 py-3 md:py-4 font-black text-xs md:text-sm flex flex-col items-center gap-1 transition-all rounded-2xl relative ${mode === m.id ? 'text-indigo-600 bg-white shadow-sm scale-105' : m.comingSoon ? 'text-indigo-200 cursor-not-allowed' : 'text-indigo-300'}`}
               >
-                <m.icon className="w-5 h-5 md:w-6 md:h-6"/> {m.label}
+                <m.icon className="w-5 h-5 md:w-6 md:h-6"/>
+                <span>{m.label}</span>
+                {m.comingSoon && (
+                  <span className="absolute -top-1 -right-1 bg-orange-400 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full leading-none">Sắp ra</span>
+                )}
               </button>
             ))}
         </div>

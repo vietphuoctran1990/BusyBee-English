@@ -23,6 +23,16 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
   const [sceneImages, setSceneImages] = useState<Record<number, string>>({});
   const [currentWordIndex, setCurrentWordIndex] = useState<number>(-1);
   const [cachedAudio, setCachedAudio] = useState<Record<number, string>>({});
+  const [tappedWord, setTappedWord] = useState<string | null>(null);
+
+  // Quiz state
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizDone, setQuizDone] = useState(false);
+  const [quizFeedback, setQuizFeedback] = useState<'none' | 'correct' | 'wrong'>('none');
+  const [quizOptions, setQuizOptions] = useState<string[]>([]);
+  const quizWords = (data.vocabulary ?? []).filter(w => w.trim().length > 0);
 
   const t = TRANSLATIONS[lang];
   const currentScene = data.scenes[currentSceneIndex];
@@ -72,9 +82,57 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
     return () => { isMounted = false; };
   }, [data.scenes, data.characterDescription]);
 
+  const handleTapWord = (word: string) => {
+    const clean = word.replace(/[^a-zA-Z'-]/g, '');
+    if (!clean) return;
+    setTappedWord(clean);
+    speakWithBrowser(clean, 'en').catch(() => {});
+    setTimeout(() => setTappedWord(null), 1000);
+  };
+
+  const startQuiz = () => {
+    if (quizWords.length < 2) return;
+    setQuizIndex(0);
+    setQuizScore(0);
+    setQuizDone(false);
+    setQuizFeedback('none');
+    buildQuizOptions(0);
+    setShowQuiz(true);
+  };
+
+  const buildQuizOptions = (idx: number) => {
+    const correct = quizWords[idx];
+    const pool = quizWords.filter((_, i) => i !== idx);
+    const wrongs = pool.sort(() => 0.5 - Math.random()).slice(0, 3);
+    setQuizOptions([...wrongs, correct].sort(() => 0.5 - Math.random()));
+    setTimeout(() => speakWithBrowser(correct, 'en').catch(() => {}), 300);
+  };
+
+  const handleQuizAnswer = (word: string) => {
+    if (quizFeedback !== 'none') return;
+    const correct = word === quizWords[quizIndex];
+    setQuizFeedback(correct ? 'correct' : 'wrong');
+    if (correct) setQuizScore(s => s + 1);
+    setTimeout(() => {
+      const next = quizIndex + 1;
+      if (next >= quizWords.length) {
+        setQuizDone(true);
+      } else {
+        setQuizIndex(next);
+        setQuizFeedback('none');
+        buildQuizOptions(next);
+      }
+    }, 1100);
+  };
+
   const handleNext = () => {
     stopPlayback();
-    setCurrentSceneIndex(prev => (prev + 1) % data.scenes.length);
+    const isLast = currentSceneIndex === data.scenes.length - 1;
+    if (isLast && quizWords.length >= 2 && !showQuiz) {
+      startQuiz();
+    } else {
+      setCurrentSceneIndex(prev => (prev + 1) % data.scenes.length);
+    }
   };
   
   const handlePrev = () => {
@@ -153,6 +211,69 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
   if (!currentScene) return null;
   const sceneWords = currentScene.text.split(/\s+/);
 
+  if (showQuiz) {
+    return (
+      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-indigo-950/98 backdrop-blur-xl animate-fade-in">
+        <div className="bg-white w-full h-full md:h-auto md:max-w-sm md:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+          {/* Quiz header */}
+          <div className="bg-indigo-600 px-6 py-5 text-white flex items-center justify-between shrink-0" style={{ paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
+            <div>
+              <p className="text-indigo-200 text-xs font-black uppercase tracking-widest mb-0.5">{lang === 'vn' ? 'Kiểm tra từ vựng' : 'Vocabulary Quiz'}</p>
+              <h2 className="text-xl font-black">{quizDone ? (lang === 'vn' ? 'Xong rồi! 🎉' : 'All done! 🎉') : `${quizIndex + 1} / ${quizWords.length}`}</h2>
+            </div>
+            <button onClick={onClose} className="p-2 bg-white/20 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
+          </div>
+
+          {quizDone ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <div className="text-7xl mb-4">{quizScore >= quizWords.length ? '🏆' : quizScore >= quizWords.length / 2 ? '⭐' : '💪'}</div>
+              <h3 className="text-2xl font-black text-indigo-900 mb-2">{quizScore}/{quizWords.length} {lang === 'vn' ? 'đúng' : 'correct'}</h3>
+              <p className="text-indigo-400 font-bold text-sm mb-8">{quizScore >= quizWords.length ? (lang === 'vn' ? 'Xuất sắc! Bé học rất giỏi!' : 'Perfect score! Amazing!') : (lang === 'vn' ? 'Cố gắng thêm nhé!' : 'Keep it up!')}</p>
+              <button onClick={onClose} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl text-lg">{lang === 'vn' ? 'Đóng truyện' : 'Close story'}</button>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col p-6 gap-5">
+              <div className="text-center">
+                <p className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-3">{lang === 'vn' ? 'Đây là từ nào?' : 'Which word did you hear?'}</p>
+                <button
+                  onClick={() => speakWithBrowser(quizWords[quizIndex], 'en').catch(() => {})}
+                  className="w-20 h-20 mx-auto bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shadow-md hover:bg-indigo-200 active:scale-95 transition-all"
+                >
+                  <SpeakerWaveIcon className="w-10 h-10" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 flex-1">
+                {quizOptions.map(opt => {
+                  const isCorrect = opt === quizWords[quizIndex];
+                  const bgClass = quizFeedback === 'none'
+                    ? 'bg-white border-indigo-100 hover:bg-indigo-50 active:scale-95'
+                    : isCorrect ? 'bg-green-50 border-green-400 ring-4 ring-green-300 scale-105'
+                    : quizFeedback === 'wrong' ? 'opacity-40 bg-white border-gray-100'
+                    : 'bg-red-50 border-red-300';
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => handleQuizAnswer(opt)}
+                      disabled={quizFeedback !== 'none'}
+                      className={`p-4 border-2 rounded-2xl font-black text-indigo-900 transition-all text-base ${bgClass}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              {quizFeedback !== 'none' && (
+                <div className={`text-center font-black text-lg py-2 animate-fade-in ${quizFeedback === 'correct' ? 'text-green-600' : 'text-red-500'}`}>
+                  {quizFeedback === 'correct' ? '✓ ' + (lang === 'vn' ? 'Đúng rồi!' : 'Correct!') : '✗ ' + quizWords[quizIndex]}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-indigo-950/98 backdrop-blur-xl animate-fade-in" onClick={onClose}>
         <div className="bg-white w-full h-full md:h-[85vh] md:max-h-[760px] md:max-w-5xl md:rounded-[2rem] shadow-[0_0_120px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col relative animate-scale-up" onClick={e => e.stopPropagation()}>
@@ -221,16 +342,26 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
                                 </button>
                             </div>
                             
-                            {/* Văn bản truyện: Giảm 30% (text-lg), Dàn trang đều (text-justify) */}
+                            {/* Văn bản truyện: tap word to pronounce */}
                             <div className="text-base md:text-lg font-black text-indigo-950 leading-snug md:leading-snug text-justify flex flex-wrap gap-x-1 gap-y-1 md:gap-x-2 md:gap-y-1">
-                                {sceneWords.map((word, idx) => (
-                                    <span 
-                                        key={idx} 
-                                        className={`transition-all duration-300 rounded-md px-1 py-0.5 ${currentWordIndex === idx ? 'text-white bg-pink-500 scale-105 shadow-sm z-10' : 'text-indigo-900'}`}
-                                    >
+                                {sceneWords.map((word, idx) => {
+                                    const clean = word.replace(/[^a-zA-Z'-]/g, '');
+                                    const isTapped = tappedWord === clean && clean.length > 0;
+                                    return (
+                                      <span
+                                        key={idx}
+                                        onClick={() => handleTapWord(word)}
+                                        className={`transition-all duration-300 rounded-md px-1 py-0.5 ${
+                                          currentWordIndex === idx ? 'text-white bg-pink-500 scale-105 shadow-sm z-10'
+                                          : isTapped ? 'text-white bg-indigo-500 scale-110 shadow-md'
+                                          : clean ? 'text-indigo-900 hover:bg-indigo-50 cursor-pointer active:bg-indigo-100'
+                                          : 'text-indigo-900'
+                                        }`}
+                                      >
                                         {word}
-                                    </span>
-                                ))}
+                                      </span>
+                                    );
+                                })}
                             </div>
                             
                             {/* Dịch Tiếng Việt - Gọn nhất có thể */}

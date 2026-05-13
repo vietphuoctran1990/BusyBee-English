@@ -46,14 +46,24 @@ const PracticeSetup: React.FC<PracticeSetupProps> = ({ savedItems, onStartGame, 
   };
   
   const handleSmartReview = () => {
-      const needsPractice = savedItems.filter(item => (item.proficiency || 0) < 80);
-      const smartSet = new Set<string>();
-      needsPractice.forEach(i => smartSet.add(i.id));
-      if (smartSet.size < 5) {
-          const others = savedItems.filter(i => !smartSet.has(i.id)).sort(() => 0.5 - Math.random());
-          others.slice(0, 5 - smartSet.size).forEach(i => smartSet.add(i.id));
-      }
-      setSelectedIds(smartSet);
+    const now = Date.now();
+    // Priority 1: SRS-due items (overdue for review)
+    const due = savedItems.filter(i => !i.srsNextReview || i.srsNextReview <= now);
+    // Priority 2: low proficiency items not yet due, sorted by proficiency ascending
+    const notDue = savedItems
+      .filter(i => i.srsNextReview && i.srsNextReview > now)
+      .sort((a, b) => (a.proficiency ?? 50) - (b.proficiency ?? 50));
+    const pool = [...due, ...notDue];
+    const smartSet = new Set(pool.slice(0, 20).map(i => i.id));
+    // Fill to at least 5 with random items if needed
+    if (smartSet.size < 5) {
+      savedItems
+        .filter(i => !smartSet.has(i.id))
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 5 - smartSet.size)
+        .forEach(i => smartSet.add(i.id));
+    }
+    setSelectedIds(smartSet);
   };
 
   const isAllVisibleSelected = visibleItems.length > 0 && visibleItems.every(i => selectedIds.has(i.id));
@@ -64,27 +74,33 @@ const PracticeSetup: React.FC<PracticeSetupProps> = ({ savedItems, onStartGame, 
     onStartGame(shuffled, selectedGame);
   };
 
-  const GameOption = ({ type, icon: Icon, title, desc, color }: { type: GameType, icon: any, title: string, desc: string, color: string }) => (
-    <button
-      onClick={() => setSelectedGame(type)}
-      className={`relative p-4 rounded-2xl border-4 text-left transition-all duration-200 ${
-        selectedGame === type 
-          ? `border-${color}-500 bg-${color}-50 ring-2 ring-${color}-200 scale-105 shadow-xl` 
-          : 'border-gray-100 bg-white hover:bg-gray-50'
-      }`}
-    >
-      {selectedGame === type && (
-        <div className={`absolute -top-3 -right-3 bg-${color}-500 text-white p-1 rounded-full shadow-md`}>
-          <CheckCircleIcon className="w-5 h-5" />
+  const GAME_COLORS: Record<string, { border: string; bg: string; ring: string; badge: string; icon: string }> = {
+    blue:   { border: 'border-blue-500',   bg: 'bg-blue-50',   ring: 'ring-blue-200',   badge: 'bg-blue-500',   icon: 'bg-blue-100 text-blue-600' },
+    sky:    { border: 'border-sky-500',    bg: 'bg-sky-50',    ring: 'ring-sky-200',    badge: 'bg-sky-500',    icon: 'bg-sky-100 text-sky-600' },
+    indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50', ring: 'ring-indigo-200', badge: 'bg-indigo-500', icon: 'bg-indigo-100 text-indigo-600' },
+  };
+
+  const GameOption = ({ type, icon: Icon, title, desc, color }: { type: GameType, icon: any, title: string, desc: string, color: string }) => {
+    const c = GAME_COLORS[color] ?? GAME_COLORS.blue;
+    const active = selectedGame === type;
+    return (
+      <button
+        onClick={() => setSelectedGame(type)}
+        className={`relative p-4 rounded-2xl border-4 text-left transition-all duration-200 ${active ? `${c.border} ${c.bg} ring-2 ${c.ring} scale-105 shadow-xl` : 'border-gray-100 bg-white hover:bg-gray-50'}`}
+      >
+        {active && (
+          <div className={`absolute -top-3 -right-3 ${c.badge} text-white p-1 rounded-full shadow-md`}>
+            <CheckCircleIcon className="w-5 h-5" />
+          </div>
+        )}
+        <div className={`w-12 h-12 rounded-xl ${c.icon} flex items-center justify-center mb-3`}>
+          <Icon className="w-7 h-7" />
         </div>
-      )}
-      <div className={`w-12 h-12 rounded-xl bg-${color}-100 text-${color}-600 flex items-center justify-center mb-3`}>
-        <Icon className="w-7 h-7" />
-      </div>
-      <h3 className="font-black text-gray-800 text-lg">{title}</h3>
-      <p className="text-sm text-gray-500 font-medium leading-tight">{desc}</p>
-    </button>
-  );
+        <h3 className="font-black text-gray-800 text-lg">{title}</h3>
+        <p className="text-sm text-gray-500 font-medium leading-tight">{desc}</p>
+      </button>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 pb-20 animate-fade-in">
