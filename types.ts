@@ -59,6 +59,8 @@ export interface UserStats {
   milestonesSeen?: number[];   // streak milestones already celebrated
   // Weekly activity: array of 7 numbers (cards created per day, oldest first)
   weeklyActivity?: number[];
+  // Achievement IDs the user has unlocked
+  achievements?: string[];
 }
 
 export type GameType = 'listening' | 'speaking' | 'spelling';

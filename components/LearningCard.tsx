@@ -25,13 +25,16 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
   const isPlayingRef = useRef(false);
   const t = TRANSLATIONS[lang];
 
-  const handlePlay = useCallback(async (e?: React.MouseEvent) => {
+  const handlePlay = useCallback(async (e?: React.MouseEvent, slow = false) => {
     e?.stopPropagation();
     if (!item.text || isPlayingRef.current) return;
     isPlayingRef.current = true;
     setIsPlaying(true);
     try {
-      if (item.audioBase64) {
+      // Slow mode always uses browser TTS so we can control rate
+      if (slow) {
+        await speakWithBrowser(item.text, 'en', { rate: 0.55, accent });
+      } else if (item.audioBase64) {
         const buffer = await decodeBase64Audio(item.audioBase64);
         playAudioBuffer(buffer);
         await new Promise(resolve => setTimeout(resolve, (buffer.duration * 1000) + 200));
@@ -39,11 +42,16 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
         await speakWithBrowser(item.text, 'en', { rate: 1.0, accent });
       }
     } catch {
-      await speakWithBrowser(item.text, 'en', { rate: 1.0, accent });
+      await speakWithBrowser(item.text, 'en', { rate: slow ? 0.55 : 1.0, accent });
     }
     isPlayingRef.current = false;
     setIsPlaying(false);
   }, [item.text, item.audioBase64, accent]);
+
+  const handlePlaySlow = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    handlePlay(undefined, true);
+  }, [handlePlay]);
 
   const toggleTranslate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -160,15 +168,26 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
           )}
         </div>
 
+        <div className="flex gap-2">
         <button
           onClick={handlePlay}
           disabled={isPlaying || item.loading || !!item.error || isRegenerating}
-          className="w-full py-3 md:py-4 clay-button clay-blue text-white font-black flex items-center justify-center gap-2 text-base md:text-xl shadow-lg disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+          className="flex-1 py-3 md:py-4 clay-button clay-blue text-white font-black flex items-center justify-center gap-2 text-base md:text-xl shadow-lg disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
         >
           {isPlaying
             ? <ArrowPathIcon className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
             : <><SpeakerWaveIcon className="w-5 h-5 md:w-6 md:h-6" /><span>{t.listen}</span></>}
         </button>
+        <button
+          onClick={handlePlaySlow}
+          disabled={isPlaying || item.loading || !!item.error || isRegenerating}
+          title={lang === 'vn' ? 'Phát chậm' : 'Slow playback'}
+          className="px-3 md:px-4 py-3 md:py-4 clay-button clay-white text-blue-500 font-black flex items-center justify-center gap-1 text-xs md:text-sm shadow border-2 border-blue-100 disabled:opacity-50 disabled:grayscale transition-all active:scale-95"
+        >
+          <SpeakerWaveIcon className="w-4 h-4 md:w-5 md:h-5 opacity-70" />
+          <span className="hidden sm:inline">0.5x</span>
+        </button>
+        </div>
 
         {/* Word families */}
         {item.wordFamilies && item.wordFamilies.length > 0 && !item.loading && (

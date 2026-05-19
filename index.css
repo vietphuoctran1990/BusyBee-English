@@ -49,6 +49,15 @@
   100% { transform: translateY(-20px) rotate(5deg); opacity: 0; }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.animate-shake { animation: shake 0.5s ease-in-out; }
+
 /* Force-include dynamic bg classes used in sticker data */
 @source inline("bg-yellow-100 bg-orange-100 bg-blue-100 bg-green-100 bg-amber-100 bg-purple-100 bg-pink-100 bg-stone-100 bg-rose-50 bg-teal-50 bg-gray-100 bg-sky-100 bg-blue-50 bg-orange-200 bg-blue-200 bg-green-200 bg-yellow-50 bg-orange-50 bg-red-50 bg-purple-50 bg-stone-50");
 

@@ -70,16 +70,51 @@ const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems
 
   const isTransitioning = useRef(false);
 
-  const calcSimilarity = (a: string, b: string): number => {
+  // Word-level Levenshtein similarity (0..1).
+  // Matches when each target word appears with ≤25% edit distance somewhere
+  // in the recognised transcript.
+  const calcSimilarity = (heard: string, target: string): number => {
     const norm = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '');
-    const na = norm(a);
-    const nb = norm(b);
-    if (na === nb) return 1.0;
-    if (na.includes(nb) || nb.includes(na)) return 0.9;
-    const setA = new Set(na.split(''));
-    const setB = new Set(nb.split(''));
-    const intersection = [...setA].filter(c => setB.has(c)).length;
-    return intersection / Math.max(setA.size, setB.size);
+    const a = norm(heard), b = norm(target);
+    if (!a || !b) return 0;
+    if (a === b) return 1.0;
+    if (a.includes(b) || b.includes(a)) return 0.92;
+    const aWords = a.split(/\s+/);
+    const bWords = b.split(/\s+/);
+    let matched = 0;
+    bWords.forEach(bw => {
+      const best = Math.max(0, ...aWords.map(aw => wordSimilarity(aw, bw)));
+      if (best >= 0.75) matched += 1;
+      else if (best >= 0.5) matched += 0.5;
+    });
+    return matched / bWords.length;
+  };
+
+  // 1 - normalised Levenshtein distance
+  const wordSimilarity = (a: string, b: string): number => {
+    if (a === b) return 1;
+    if (!a || !b) return 0;
+    const len = Math.max(a.length, b.length);
+    const dist = levenshtein(a, b);
+    return Math.max(0, 1 - dist / len);
+  };
+
+  const levenshtein = (a: string, b: string): number => {
+    if (a === b) return 0;
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    let prev = new Array(n + 1).fill(0).map((_, j) => j);
+    let curr = new Array(n + 1).fill(0);
+    for (let i = 1; i <= m; i++) {
+      curr[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+      }
+      [prev, curr] = [curr, prev];
+    }
+    return prev[n];
   };
 
   const recognitionRef = useRef<any>(null);

@@ -16,6 +16,26 @@ interface AIFriendModalProps {
   onReward?: (stars: number) => void;
 }
 
+interface Mission {
+  id: string;
+  emoji: string;
+  labelVn: string;
+  labelEn: string;
+  promptVn: string;
+  promptEn: string;
+}
+
+const MISSIONS: Mission[] = [
+  { id: 'greet', emoji: '👋', labelVn: 'Chào hỏi', labelEn: 'Greet', promptVn: 'Hi! Can you say hello to me?', promptEn: 'Hi! Can you say hello to me?' },
+  { id: 'animals', emoji: '🐶', labelVn: 'Con vật', labelEn: 'Animals', promptVn: 'Tell me about 3 animals. What sounds do they make?', promptEn: 'Tell me about 3 animals. What sounds do they make?' },
+  { id: 'food', emoji: '🍎', labelVn: 'Đồ ăn', labelEn: 'Food', promptVn: 'What food do you like? Tell me 3 yummy foods.', promptEn: 'What food do you like? Tell me 3 yummy foods.' },
+  { id: 'family', emoji: '👨‍👩‍👧', labelVn: 'Gia đình', labelEn: 'Family', promptVn: 'Help me talk about my family in English.', promptEn: 'Help me talk about my family in English.' },
+  { id: 'colors', emoji: '🌈', labelVn: 'Màu sắc', labelEn: 'Colors', promptVn: 'Teach me 5 colors in English with examples.', promptEn: 'Teach me 5 colors in English with examples.' },
+  { id: 'numbers', emoji: '🔢', labelVn: 'Số đếm', labelEn: 'Numbers', promptVn: 'Count from 1 to 10 with me!', promptEn: 'Count from 1 to 10 with me!' },
+  { id: 'joke', emoji: '😄', labelVn: 'Kể chuyện vui', labelEn: 'Joke', promptVn: 'Tell me a funny joke for a kid!', promptEn: 'Tell me a funny joke for a kid!' },
+  { id: 'song', emoji: '🎵', labelVn: 'Hát', labelEn: 'Song', promptVn: 'Sing me a fun English song!', promptEn: 'Sing me a fun English song!' },
+];
+
 const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = [], userProfile, fullView = false, onReward }) => {
   const [mode, setMode] = useState<FriendMode>('chat');
   const [inputText, setInputText] = useState('');
@@ -24,6 +44,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
   const [isTyping, setIsTyping] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [beeMood, setBeeMood] = useState<BeeMood>('idle');
+  const [completedMissions, setCompletedMissions] = useState<Set<string>>(new Set());
   const beeMoodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiMsgCount = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -154,10 +175,26 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
                 <>
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 md:space-y-6 no-scrollbar" ref={scrollRef}>
                         {messages.length === 0 && (
-                            <div className="text-center py-10 opacity-50">
-                                <div className="text-6xl md:text-8xl mb-4">👋</div>
-                                <h3 className="text-xl md:text-2xl font-black text-indigo-900">Chào {userProfile.name}!</h3>
-                                <p className="text-indigo-400 font-bold text-sm md:text-base">Hãy chat để luyện tiếng Anh cùng mình nhé!</p>
+                            <div className="text-center py-6 animate-fade-in">
+                                <div className="text-5xl md:text-7xl mb-3">👋</div>
+                                <h3 className="text-lg md:text-2xl font-black text-indigo-900 mb-1">Chào {userProfile.name}!</h3>
+                                <p className="text-indigo-400 font-bold text-xs md:text-sm mb-5">{lang === 'vn' ? 'Chọn một chủ đề để bắt đầu nhé!' : 'Pick a mission to get started!'}</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-md mx-auto">
+                                  {MISSIONS.map(m => (
+                                    <button
+                                      key={m.id}
+                                      onClick={() => {
+                                        setInputText(lang === 'vn' ? m.promptVn : m.promptEn);
+                                        setCompletedMissions(prev => new Set([...prev, m.id]));
+                                        playSFX('click');
+                                      }}
+                                      className={`p-3 rounded-2xl border-2 transition-all active:scale-95 ${completedMissions.has(m.id) ? 'bg-green-50 border-green-200' : 'bg-white border-indigo-100 hover:bg-indigo-50'}`}
+                                    >
+                                      <div className="text-2xl mb-1">{m.emoji}</div>
+                                      <p className="text-[10px] md:text-xs font-black text-indigo-700 leading-tight">{lang === 'vn' ? m.labelVn : m.labelEn}</p>
+                                    </button>
+                                  ))}
+                                </div>
                             </div>
                         )}
                         {messages.map(m => (

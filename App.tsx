@@ -29,6 +29,12 @@ const DeckManagerModal = lazy(() => import('./components/DeckManagerModal'));
 import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType, Deck } from './types';
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation, generateWordFamilies } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
+import { compressBase64Image } from './services/imageUtils';
+import { checkAchievements, Achievement } from './utils/achievements';
+import AchievementToast from './components/AchievementToast';
+const AchievementsModal = lazy(() => import('./components/AchievementsModal'));
+const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
+const MemoryGameModal = lazy(() => import('./components/MemoryGameModal'));
 import { checkCodeExists, downloadData, uploadData } from './services/syncService';
 import { generateSyncCode } from './services/firebaseService';
 import {
@@ -43,6 +49,8 @@ import { playSFX } from './services/audioUtils';
 import { useSettings } from './hooks/useSettings';
 import { useStats } from './hooks/useStats';
 import { useDebounce } from './hooks/useDebounce';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useInstallPrompt } from './hooks/useInstallPrompt';
 
 const USER_KEY = 'kidlingo_user_clay_v2';
 const STATS_KEY = 'kidlingo_stats_clay_v2';
@@ -96,6 +104,8 @@ const App: React.FC = () => {
 
   const { settings, setSettings } = useSettings();
   const { stats, setStats, statsRef, milestoneToast, handleRewardStars } = useStats(currentUser, settings.language);
+  const isOnline = useOnlineStatus();
+  const installPrompt = useInstallPrompt();
 
   const [view, setView] = useState<'create' | 'saved' | 'practice' | 'friend' | 'stories'>('create');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +165,11 @@ const App: React.FC = () => {
   const [showFocusSetup, setShowFocusSetup] = useState(false);
   const [focusLocked, setFocusLocked] = useState(() => isFocusModeLocked());
   const [practiceStarsMultiplier, setPracticeStarsMultiplier] = useState(1);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showParentDashboard, setShowParentDashboard] = useState(false);
+  const [showMemoryGame, setShowMemoryGame] = useState(false);
+  const [achievementToast, setAchievementToast] = useState<Achievement | null>(null);
+  const achievementCheckRef = useRef<number>(0);
 
   // Deck system
   const [decks, setDecks] = useState<Deck[]>(() => {
@@ -403,6 +418,25 @@ const App: React.FC = () => {
 
   useEffect(() => { try { localStorage.setItem(DECKS_KEY, JSON.stringify(decks)); } catch {} }, [decks]);
 
+  // Achievement check: runs on stats/items/stories change, debounced via ref
+  useEffect(() => {
+    if (!currentUser) return;
+    const now = Date.now();
+    if (now - achievementCheckRef.current < 600) return;
+    achievementCheckRef.current = now;
+    const newly = checkAchievements(stats.achievements ?? [], {
+      stats, items, storiesCount: stories.length,
+    });
+    if (newly.length > 0) {
+      setStats(prev => ({
+        ...prev,
+        achievements: Array.from(new Set([...(prev.achievements ?? []), ...newly.map(a => a.id)])),
+      }));
+      setAchievementToast(newly[0]);
+      playSFX('success');
+    }
+  }, [stats.cardsCreated, stats.streak, stats.stars, items, stories.length, currentUser]); // eslint-disable-line
+
   // SW update event — fired from index.html when new SW is waiting
   useEffect(() => {
     const onSwUpdate = (e: Event) => {
@@ -456,6 +490,8 @@ const App: React.FC = () => {
 
       if (deletedItemIds.current.has(itemId)) return;
 
+      const compressed = imageUrl ? await compressBase64Image(imageUrl) : undefined;
+
       const isWord = !text.includes(' ');
       const finalItem: LearningItem = {
         ...newItem,
@@ -465,7 +501,7 @@ const App: React.FC = () => {
         example: details.example,
         emoji: details.emoji,
         topic: details.topic,
-        imageUrl: imageUrl || undefined,
+        imageUrl: compressed,
         loading: false,
       };
 
@@ -502,8 +538,9 @@ const App: React.FC = () => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, isRegeneratingImage: true } : i));
     try {
       const newImageUrl = await generateIllustration(item.text);
+      const compressed = newImageUrl ? await compressBase64Image(newImageUrl) : newImageUrl;
       setItems(prev => {
-        const updated = prev.map(i => i.id === id ? { ...i, imageUrl: newImageUrl, isRegeneratingImage: false } : i);
+        const updated = prev.map(i => i.id === id ? { ...i, imageUrl: compressed, isRegeneratingImage: false } : i);
         const target = updated.find(i => i.id === id);
         if (target) saveItemsToDB([target]);
         return updated;
@@ -616,14 +653,55 @@ const App: React.FC = () => {
   };
 
   const handleImportData = (data: any) => {
-    if (!data || !data.items) return;
-    const importedItems: LearningItem[] = (data.items || []).map((item: any) => ({
-      ...item,
-      userId: currentUser?.id || item.userId,
-    }));
+    // Schema validation
+    if (!data || typeof data !== 'object') {
+      showGlobalError(settings.language === 'vn' ? 'File backup không hợp lệ' : 'Invalid backup file');
+      return;
+    }
+    if (!Array.isArray(data.items)) {
+      showGlobalError(settings.language === 'vn' ? 'File thiếu danh sách thẻ' : 'File missing items array');
+      return;
+    }
+    const importedItems: LearningItem[] = data.items
+      .filter((item: any) => item && typeof item === 'object' && typeof item.text === 'string' && item.text.trim())
+      .map((item: any) => ({
+        id: typeof item.id === 'string' ? item.id : 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        userId: currentUser?.id || item.userId || 'unknown',
+        text: String(item.text).slice(0, 500),
+        type: item.type === 'sentence' ? 'sentence' : 'word',
+        imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
+        emoji: typeof item.emoji === 'string' ? item.emoji : undefined,
+        audioBase64: typeof item.audioBase64 === 'string' ? item.audioBase64 : undefined,
+        phonetic: typeof item.phonetic === 'string' ? item.phonetic : undefined,
+        vietnameseTranslation: typeof item.vietnameseTranslation === 'string' ? item.vietnameseTranslation : undefined,
+        example: typeof item.example === 'string' ? item.example : undefined,
+        topic: typeof item.topic === 'string' ? item.topic : undefined,
+        loading: false,
+        isSaved: !!item.isSaved,
+        proficiency: typeof item.proficiency === 'number' ? Math.max(0, Math.min(100, item.proficiency)) : 0,
+        srsInterval: typeof item.srsInterval === 'number' ? item.srsInterval : undefined,
+        srsEaseFactor: typeof item.srsEaseFactor === 'number' ? item.srsEaseFactor : undefined,
+        srsNextReview: typeof item.srsNextReview === 'number' ? item.srsNextReview : undefined,
+        wordFamilies: Array.isArray(item.wordFamilies) ? item.wordFamilies.filter((w: any) => typeof w === 'string').slice(0, 12) : undefined,
+        createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : Date.now(),
+      }));
+
+    if (importedItems.length === 0) {
+      showGlobalError(settings.language === 'vn' ? 'Không có thẻ nào hợp lệ trong file' : 'No valid cards in file');
+      return;
+    }
+
     setItems(importedItems);
     saveItemsToDB(importedItems);
-    if (data.stories) setStories(data.stories);
+
+    // Validate stories
+    if (Array.isArray(data.stories)) {
+      const validStories = data.stories.filter(
+        (s: any) => s && typeof s === 'object' && typeof s.title === 'string' && Array.isArray(s.scenes),
+      );
+      setStories(validStories);
+    }
     scheduleCloudPush();
     playSFX('success');
   };
@@ -811,9 +889,80 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-[400] bg-gradient-to-r from-gray-600 to-gray-700 text-white text-center text-xs font-black py-1.5 px-4 shadow-lg flex items-center justify-center gap-2 animate-fade-in" style={{ paddingTop: 'max(6px, env(safe-area-inset-top))' }}>
+          <span className="inline-block w-2 h-2 bg-orange-300 rounded-full animate-pulse" />
+          {settings.language === 'vn' ? 'Đang offline — Một số tính năng có thể không hoạt động' : 'Offline — Some features may not work'}
+        </div>
+      )}
+
+      {/* PWA install prompt */}
+      {installPrompt.show && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[400] w-[92%] max-w-sm animate-scale-up" style={{ bottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+          <div className="bg-white rounded-2xl shadow-2xl border-2 border-blue-200 p-4 flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center text-2xl shrink-0">🐝</div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-blue-900 text-sm leading-tight">
+                {settings.language === 'vn' ? 'Cài Busy Bee về máy?' : 'Install Busy Bee?'}
+              </p>
+              <p className="text-blue-400 text-xs font-bold">
+                {settings.language === 'vn' ? 'Mở nhanh như app, dùng offline' : 'Faster, works offline'}
+              </p>
+            </div>
+            <button onClick={installPrompt.dismiss} className="px-3 py-2 text-gray-400 font-black text-xs hover:bg-gray-50 rounded-xl">
+              {settings.language === 'vn' ? 'Để sau' : 'Later'}
+            </button>
+            <button onClick={installPrompt.accept} className="px-4 py-2 bg-blue-500 text-white font-black text-xs rounded-xl shadow-md active:scale-95">
+              {settings.language === 'vn' ? 'Cài đặt' : 'Install'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {showIntroModal && <IntroModal onClose={() => setShowIntroModal(false)} lang={settings.language} />}
 
+      {achievementToast && (
+        <AchievementToast
+          achievement={achievementToast}
+          lang={settings.language}
+          onDone={() => setAchievementToast(null)}
+        />
+      )}
+
       <Suspense fallback={<ModalFallback />}>
+
+      {showAchievements && (
+        <AchievementsModal
+          stats={stats}
+          items={items}
+          storiesCount={stories.length}
+          lang={settings.language}
+          onClose={() => setShowAchievements(false)}
+        />
+      )}
+
+      {showParentDashboard && (
+        <ParentDashboard
+          stats={stats}
+          items={items}
+          stories={stories}
+          lang={settings.language}
+          onClose={() => setShowParentDashboard(false)}
+        />
+      )}
+
+      {showMemoryGame && (
+        <MemoryGameModal
+          items={items}
+          lang={settings.language}
+          onClose={() => setShowMemoryGame(false)}
+          onComplete={(stars) => {
+            handleRewardStars(stars);
+            setShowMemoryGame(false);
+          }}
+        />
+      )}
 
       {showSettings && (
         <SettingsModal
@@ -1485,6 +1634,13 @@ const App: React.FC = () => {
                   {srsReviewCount > 0 && <span className="bg-white text-indigo-600 text-xs font-black px-2 py-0.5 rounded-full">{srsReviewCount}</span>}
                 </button>
                 <button
+                  onClick={() => setShowMemoryGame(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-pink-500 text-white font-black rounded-2xl shadow-lg hover:bg-pink-600 active:scale-95 transition-all"
+                >
+                  <span className="text-xl">🧠</span>
+                  {settings.language === 'vn' ? 'Trí nhớ' : 'Memory'}
+                </button>
+                <button
                   onClick={() => setShowDailyChallenge(true)}
                   className={`flex items-center gap-2 px-5 py-3 font-black rounded-2xl shadow-lg active:scale-95 transition-all ${dailyChallengeAlreadyDone ? 'bg-green-100 text-green-700' : 'bg-orange-400 text-white hover:bg-orange-500'}`}
                 >
@@ -1498,6 +1654,23 @@ const App: React.FC = () => {
                 >
                   <ChartBarIcon className="w-5 h-5" />
                   {t.statsScreen}
+                </button>
+                <button
+                  onClick={() => setShowAchievements(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-yellow-100 text-yellow-700 font-black rounded-2xl shadow-sm hover:bg-yellow-200 active:scale-95 transition-all"
+                >
+                  <TrophyIcon className="w-5 h-5" />
+                  {settings.language === 'vn' ? 'Thành tích' : 'Achievements'}
+                  <span className="bg-white text-yellow-600 text-xs font-black px-2 py-0.5 rounded-full">
+                    {(stats.achievements ?? []).length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setShowParentDashboard(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-purple-100 text-purple-700 font-black rounded-2xl shadow-sm hover:bg-purple-200 active:scale-95 transition-all"
+                >
+                  <ShieldCheckIcon className="w-5 h-5" />
+                  {settings.language === 'vn' ? 'Phụ huynh' : 'Parent'}
                 </button>
               </div>
               <PracticeSetup
