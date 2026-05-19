@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import InputArea from './components/InputArea';
 import LearningCard from './components/LearningCard';
+import VirtualGrid from './components/VirtualGrid';
 import PracticeSetup from './components/PracticeSetup';
 import IntroModal from './components/IntroModal';
 import LoginScreen from './components/LoginScreen';
@@ -30,11 +31,14 @@ import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, S
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation, generateWordFamilies } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
 import { compressBase64Image } from './services/imageUtils';
+import { enqueueAction, replayQueue, getQueueSize } from './services/offlineQueue';
 import { checkAchievements, Achievement } from './utils/achievements';
 import AchievementToast from './components/AchievementToast';
 const AchievementsModal = lazy(() => import('./components/AchievementsModal'));
 const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
 const MemoryGameModal = lazy(() => import('./components/MemoryGameModal'));
+const FillInBlankGame = lazy(() => import('./components/FillInBlankGame'));
+const SentenceScrambleGame = lazy(() => import('./components/SentenceScrambleGame'));
 import { checkCodeExists, downloadData, uploadData } from './services/syncService';
 import { generateSyncCode } from './services/firebaseService';
 import {
@@ -168,6 +172,8 @@ const App: React.FC = () => {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showParentDashboard, setShowParentDashboard] = useState(false);
   const [showMemoryGame, setShowMemoryGame] = useState(false);
+  const [showFillBlank, setShowFillBlank] = useState(false);
+  const [showScramble, setShowScramble] = useState<'visible' | 'listen' | null>(null);
   const [achievementToast, setAchievementToast] = useState<Achievement | null>(null);
   const achievementCheckRef = useRef<number>(0);
 
@@ -404,10 +410,17 @@ const App: React.FC = () => {
     } catch {}
   };
 
-  // Debounced cloud push — reads from refs so no stale closure issues
+  // Debounced cloud push — reads from refs so no stale closure issues.
+  // Records a pending marker when offline; the replay effect drains it on
+  // reconnect by doing a full state push.
   const scheduleCloudPush = useCallback(() => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        // Mark that we have pending changes to sync later
+        enqueueAction({ type: 'update_stats', patch: {} });
+        return;
+      }
       uploadData(syncCode, {
         items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
         stories: storiesRef.current,
@@ -415,6 +428,24 @@ const App: React.FC = () => {
       }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
     }, 1000);
   }, [syncCode]);
+
+  // Replay offline queue when coming back online
+  useEffect(() => {
+    if (!isOnline || !currentUser) return;
+    const size = getQueueSize();
+    if (size === 0) return;
+    // Cloud push handles the full set, so we just trigger one and clear queue
+    replayQueue({
+      onAddItem: async () => {},
+      onUpdateItem: async () => {},
+      onDeleteItem: async () => {},
+      onSaveStory: async () => {},
+      onDeleteStory: async () => {},
+      onUpdateStats: async () => {},
+    }).then(() => {
+      scheduleCloudPush();
+    });
+  }, [isOnline, currentUser, scheduleCloudPush]);
 
   useEffect(() => { try { localStorage.setItem(DECKS_KEY, JSON.stringify(decks)); } catch {} }, [decks]);
 
@@ -893,7 +924,10 @@ const App: React.FC = () => {
       {!isOnline && (
         <div className="fixed top-0 left-0 right-0 z-[400] bg-gradient-to-r from-gray-600 to-gray-700 text-white text-center text-xs font-black py-1.5 px-4 shadow-lg flex items-center justify-center gap-2 animate-fade-in" style={{ paddingTop: 'max(6px, env(safe-area-inset-top))' }}>
           <span className="inline-block w-2 h-2 bg-orange-300 rounded-full animate-pulse" />
-          {settings.language === 'vn' ? 'Đang offline — Một số tính năng có thể không hoạt động' : 'Offline — Some features may not work'}
+          <span>{settings.language === 'vn' ? 'Đang offline — Thay đổi sẽ đồng bộ khi có mạng' : 'Offline — Changes will sync when back online'}</span>
+          {getQueueSize() > 0 && (
+            <span className="ml-2 bg-orange-400 px-2 py-0.5 rounded-full text-[10px]">{getQueueSize()}</span>
+          )}
         </div>
       )}
 
@@ -960,6 +994,51 @@ const App: React.FC = () => {
           onComplete={(stars) => {
             handleRewardStars(stars);
             setShowMemoryGame(false);
+          }}
+        />
+      )}
+
+      {showFillBlank && (
+        <FillInBlankGame
+          items={items}
+          lang={settings.language}
+          onClose={() => setShowFillBlank(false)}
+          onComplete={(stars, srsUpdates) => {
+            handleRewardStars(stars);
+            if (srsUpdates.length > 0) {
+              setItems(prev => prev.map(item => {
+                const u = srsUpdates.find(r => r.itemId === item.id);
+                if (!u) return item;
+                const updated = { ...item, ...u.update };
+                saveItemsToDB([updated]).catch(() => {});
+                return updated;
+              }));
+              scheduleCloudPush();
+            }
+            setShowFillBlank(false);
+          }}
+        />
+      )}
+
+      {showScramble && (
+        <SentenceScrambleGame
+          items={items}
+          lang={settings.language}
+          listenMode={showScramble === 'listen'}
+          onClose={() => setShowScramble(null)}
+          onComplete={(stars, srsUpdates) => {
+            handleRewardStars(stars);
+            if (srsUpdates.length > 0) {
+              setItems(prev => prev.map(item => {
+                const u = srsUpdates.find(r => r.itemId === item.id);
+                if (!u) return item;
+                const updated = { ...item, ...u.update };
+                saveItemsToDB([updated]).catch(() => {});
+                return updated;
+              }));
+              scheduleCloudPush();
+            }
+            setShowScramble(null);
           }}
         />
       )}
@@ -1474,6 +1553,32 @@ const App: React.FC = () => {
                     Tạo thẻ ngay
                   </button>
                 </div>
+              ) : filteredSavedItems.length > 60 ? (
+                <VirtualGrid
+                  items={filteredSavedItems}
+                  rowHeight={420}
+                  renderItem={(item) => (
+                    <LearningCard
+                      item={item}
+                      onDelete={deleteItem}
+                      onRetry={() => addItem(item.text, null)}
+                      onToggleSave={(id) => {
+                        const updated = items.map(i => i.id === id ? { ...i, isSaved: false } : i);
+                        setItems(updated);
+                        const target = updated.find(i => i.id === id);
+                        if (target) saveItemsToDB([target]);
+                        scheduleCloudPush();
+                        playSFX('click');
+                      }}
+                      onRegenerateImage={regenerateImage}
+                      onRegenerateAudio={regenerateAudio}
+                      onZoom={setZoomedImage}
+                      onEdit={(id) => { const target = items.find(i => i.id === id); if (target) setEditingItem(target); }}
+                      lang={settings.language}
+                      accent={settings.accent}
+                    />
+                  )}
+                />
               ) : (
                 <div className={settings.cardLayout === 'grid'
                   ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-6'
@@ -1639,6 +1744,27 @@ const App: React.FC = () => {
                 >
                   <span className="text-xl">🧠</span>
                   {settings.language === 'vn' ? 'Trí nhớ' : 'Memory'}
+                </button>
+                <button
+                  onClick={() => setShowFillBlank(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white font-black rounded-2xl shadow-lg hover:bg-green-600 active:scale-95 transition-all"
+                >
+                  <span className="text-xl">✏️</span>
+                  {settings.language === 'vn' ? 'Điền từ' : 'Fill Blank'}
+                </button>
+                <button
+                  onClick={() => setShowScramble('visible')}
+                  className="flex items-center gap-2 px-5 py-3 bg-orange-500 text-white font-black rounded-2xl shadow-lg hover:bg-orange-600 active:scale-95 transition-all"
+                >
+                  <span className="text-xl">🧩</span>
+                  {settings.language === 'vn' ? 'Sắp xếp câu' : 'Scramble'}
+                </button>
+                <button
+                  onClick={() => setShowScramble('listen')}
+                  className="flex items-center gap-2 px-5 py-3 bg-purple-500 text-white font-black rounded-2xl shadow-lg hover:bg-purple-600 active:scale-95 transition-all"
+                >
+                  <span className="text-xl">🎧</span>
+                  {settings.language === 'vn' ? 'Nghe & sắp' : 'Listen & Arrange'}
                 </button>
                 <button
                   onClick={() => setShowDailyChallenge(true)}
