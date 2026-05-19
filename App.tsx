@@ -1,25 +1,31 @@
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import InputArea from './components/InputArea';
 import LearningCard from './components/LearningCard';
 import PracticeSetup from './components/PracticeSetup';
-import PracticeArena from './components/PracticeArena';
-import SaveTopicModal from './components/SaveTopicModal';
-import EditCardModal from './components/EditCardModal';
-import StoryModal from './components/StoryModal';
-import StickerBookModal from './components/StickerBookModal';
 import IntroModal from './components/IntroModal';
-import AIFriendModal from './components/AIFriendModal';
-import SettingsModal from './components/SettingsModal';
-import SlideshowModal from './components/SlideshowModal';
-import StoryCreationSetup from './components/StoryCreationSetup';
 import LoginScreen from './components/LoginScreen';
 import NotificationPrompt from './components/NotificationPrompt';
-import QuickQuizModal from './components/QuickQuizModal';
-import DailyChallengeModal from './components/DailyChallengeModal';
-import StatsModal from './components/StatsModal';
-import { FocusModeSetup, FocusModePinOverlay, isFocusModeLocked } from './components/FocusModeModal';
-import DeckManagerModal from './components/DeckManagerModal';
+const isFocusModeLocked = (): boolean => {
+  try { return !!localStorage.getItem('busybee_focus_pin'); } catch { return false; }
+};
+
+// Code-split heavy modals so they don't bloat the initial bundle
+const PracticeArena = lazy(() => import('./components/PracticeArena'));
+const SaveTopicModal = lazy(() => import('./components/SaveTopicModal'));
+const EditCardModal = lazy(() => import('./components/EditCardModal'));
+const StoryModal = lazy(() => import('./components/StoryModal'));
+const StickerBookModal = lazy(() => import('./components/StickerBookModal'));
+const AIFriendModal = lazy(() => import('./components/AIFriendModal'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const SlideshowModal = lazy(() => import('./components/SlideshowModal'));
+const StoryCreationSetup = lazy(() => import('./components/StoryCreationSetup'));
+const QuickQuizModal = lazy(() => import('./components/QuickQuizModal'));
+const DailyChallengeModal = lazy(() => import('./components/DailyChallengeModal'));
+const StatsModal = lazy(() => import('./components/StatsModal'));
+const FocusModeSetup = lazy(() => import('./components/FocusModeModal').then(m => ({ default: m.FocusModeSetup })));
+const FocusModePinOverlay = lazy(() => import('./components/FocusModeModal').then(m => ({ default: m.FocusModePinOverlay })));
+const DeckManagerModal = lazy(() => import('./components/DeckManagerModal'));
 import { LearningItem, UserProfile, AppSettings, UserStats, GameType, Sticker, StoryData, LanguageType, AccentType, Deck } from './types';
 import { generateIllustration, generateCardDetails, generateStory, generatePronunciation, generateWordFamilies } from './services/geminiService';
 import { saveItemsToDB, loadItemsFromDB, saveStoryToDB, loadStoriesFromDB, deleteItemFromDB, deleteStoryFromDB } from './services/storageService';
@@ -36,6 +42,7 @@ import { TRANSLATIONS } from './utils/translations';
 import { playSFX } from './services/audioUtils';
 import { useSettings } from './hooks/useSettings';
 import { useStats } from './hooks/useStats';
+import { useDebounce } from './hooks/useDebounce';
 
 const USER_KEY = 'kidlingo_user_clay_v2';
 const STATS_KEY = 'kidlingo_stats_clay_v2';
@@ -72,6 +79,12 @@ const ALL_STICKERS: Sticker[] = [
   { id: 'p23', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/175.png', name: 'Togepi', cost: 20, bg: 'bg-stone-50' },
   { id: 'p24', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/196.png', name: 'Espeon', cost: 45, bg: 'bg-purple-100' },
 ];
+
+const ModalFallback: React.FC = () => (
+  <div className="fixed inset-0 z-[300] flex items-center justify-center bg-blue-900/40 backdrop-blur-sm">
+    <div className="w-12 h-12 border-4 border-white/40 border-t-white rounded-full animate-spin" />
+  </div>
+);
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
@@ -294,7 +307,7 @@ const App: React.FC = () => {
         setTimeout(() => setIsSyncing(false), 600);
       } catch {}
     };
-    const timer = setInterval(poll, 10000);
+    const timer = setInterval(poll, 30000);
     return () => clearInterval(timer);
   }, [currentUser, syncCode, mergeCloudData]);
 
@@ -549,24 +562,29 @@ const App: React.FC = () => {
     return copy.sort((a, b) => a.text.localeCompare(b.text));
   }, []);
 
+  const debouncedSearch = useDebounce(searchQuery, 180);
+  const debouncedSavedSearch = useDebounce(savedSearchQuery, 180);
+
   const filteredItems = useMemo(() => {
-    const searched = items.filter(item => item.text.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = debouncedSearch.toLowerCase();
+    const searched = q ? items.filter(item => item.text.toLowerCase().includes(q)) : items;
     return applySortOrder(searched, sortOrder);
-  }, [items, searchQuery, sortOrder, applySortOrder]);
+  }, [items, debouncedSearch, sortOrder, applySortOrder]);
 
   // Fix #8: Separate filtered/sorted saved items with own search
   const filteredSavedItems = useMemo(() => {
     const activeDeckObj = activeDeck ? decks.find(d => d.id === activeDeck) : null;
+    const q = debouncedSavedSearch.toLowerCase();
     const saved = items.filter(item => {
       if (!item.isSaved) return false;
-      const matchesSearch = item.text.toLowerCase().includes(savedSearchQuery.toLowerCase()) ||
-        (item.vietnameseTranslation || '').toLowerCase().includes(savedSearchQuery.toLowerCase());
+      const matchesSearch = !q || item.text.toLowerCase().includes(q) ||
+        (item.vietnameseTranslation || '').toLowerCase().includes(q);
       const matchesTopic = activeSavedTopic ? (item.topic === activeSavedTopic) : true;
       const matchesDeck = activeDeckObj ? activeDeckObj.itemIds.includes(item.id) : true;
       return matchesSearch && matchesTopic && matchesDeck;
     });
     return applySortOrder(saved, sortOrder);
-  }, [items, savedSearchQuery, activeSavedTopic, activeDeck, decks, sortOrder, applySortOrder]);
+  }, [items, debouncedSavedSearch, activeSavedTopic, activeDeck, decks, sortOrder, applySortOrder]);
 
   const topics = useMemo(() => Array.from(new Set(items.filter(i => i.isSaved).map(i => i.topic || 'General'))), [items]);
 
@@ -672,11 +690,16 @@ const App: React.FC = () => {
 
   // Focus mode overlay
   if (focusLocked) {
-    return <FocusModePinOverlay lang={settings.language} onUnlock={() => setFocusLocked(false)} />;
+    return (
+      <Suspense fallback={<ModalFallback />}>
+        <FocusModePinOverlay lang={settings.language} onUnlock={() => setFocusLocked(false)} />
+      </Suspense>
+    );
   }
 
   if (practiceGame.active) {
     return (
+      <Suspense fallback={<ModalFallback />}>
       <PracticeArena
         items={practiceGame.items}
         gameType={practiceGame.type}
@@ -705,6 +728,7 @@ const App: React.FC = () => {
         }}
         lang={settings.language}
       />
+      </Suspense>
     );
   }
 
@@ -788,6 +812,8 @@ const App: React.FC = () => {
       )}
 
       {showIntroModal && <IntroModal onClose={() => setShowIntroModal(false)} lang={settings.language} />}
+
+      <Suspense fallback={<ModalFallback />}>
 
       {showSettings && (
         <SettingsModal
@@ -945,6 +971,8 @@ const App: React.FC = () => {
           lang={settings.language}
         />
       )}
+
+      </Suspense>
 
       {zoomedImage && (
         <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 pt-safe pb-safe" onClick={() => setZoomedImage(null)}>
@@ -1332,12 +1360,14 @@ const App: React.FC = () => {
           {view === 'stories' && (
             <div className="animate-fade-in space-y-10">
               {isSelectingForStory ? (
-                <StoryCreationSetup
-                  savedItems={items.filter(i => i.isSaved)}
-                  onConfirm={handleCreateMagicStory}
-                  onCancel={() => setIsSelectingForStory(false)}
-                  lang={settings.language}
-                />
+                <Suspense fallback={<ModalFallback />}>
+                  <StoryCreationSetup
+                    savedItems={items.filter(i => i.isSaved)}
+                    onConfirm={handleCreateMagicStory}
+                    onCancel={() => setIsSelectingForStory(false)}
+                    lang={settings.language}
+                  />
+                </Suspense>
               ) : (
                 <>
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -1482,14 +1512,16 @@ const App: React.FC = () => {
           {/* FRIEND TAB */}
           {view === 'friend' && (
             <div className="max-w-5xl mx-auto h-[75vh] md:h-[80vh]">
-              <AIFriendModal
-                userProfile={currentUser}
-                lang={settings.language}
-                items={items}
-                onClose={() => setView('create')}
-                onReward={handleRewardStars}
-                fullView={true}
-              />
+              <Suspense fallback={<ModalFallback />}>
+                <AIFriendModal
+                  userProfile={currentUser}
+                  lang={settings.language}
+                  items={items}
+                  onClose={() => setView('create')}
+                  onReward={handleRewardStars}
+                  fullView={true}
+                />
+              </Suspense>
             </div>
           )}
 

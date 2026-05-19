@@ -44,6 +44,7 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             'react-vendor': ['react', 'react-dom'],
             'genai-vendor': ['@google/genai'],
+            'icons-vendor': ['@heroicons/react'],
           },
         },
       },

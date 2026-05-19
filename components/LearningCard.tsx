@@ -188,4 +188,22 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
   );
 };
 
-export default LearningCard;
+export default React.memo(LearningCard, (prev, next) => {
+  if (prev.lang !== next.lang || prev.accent !== next.accent) return false;
+  const a = prev.item, b = next.item;
+  return (
+    a.id === b.id &&
+    a.text === b.text &&
+    a.imageUrl === b.imageUrl &&
+    a.audioBase64 === b.audioBase64 &&
+    a.phonetic === b.phonetic &&
+    a.vietnameseTranslation === b.vietnameseTranslation &&
+    a.isSaved === b.isSaved &&
+    a.loading === b.loading &&
+    a.error === b.error &&
+    a.emoji === b.emoji &&
+    a.isRegeneratingImage === b.isRegeneratingImage &&
+    a.isRegeneratingAudio === b.isRegeneratingAudio &&
+    (a.wordFamilies?.length ?? 0) === (b.wordFamilies?.length ?? 0)
+  );
+});
