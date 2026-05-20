@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, VideoCameraIcon, MicrophoneIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, StopIcon, SparklesIcon, LanguageIcon, ArrowLeftIcon } from '@heroicons/react/24/solid';
-import { GoogleGenAI, Chat } from '@google/genai';
+import type { Chat } from '@google/genai';
 import { LanguageType, FriendMode, ChatMessage, LearningItem, UserProfile } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
 import { playSFX } from '../services/audioUtils';
@@ -71,6 +71,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isTranslating: true } : m));
     
     try {
+      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -99,6 +100,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
 
     try {
         if (!chatSessionRef.current) {
+            const { GoogleGenAI } = await import('@google/genai');
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             chatSessionRef.current = ai.chats.create({
                 model: "gemini-3-flash-preview",
