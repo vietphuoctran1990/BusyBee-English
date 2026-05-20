@@ -133,6 +133,17 @@ const App: React.FC = () => {
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const notifPromptShownRef = useRef(false);
 
+  // Sync code — stable ID shared across devices (declared early so pull-to-refresh can use it)
+  const [syncCode, setSyncCode] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(SYNC_KEY);
+      if (saved) return saved;
+      const code = generateSyncCode();
+      localStorage.setItem(SYNC_KEY, code);
+      return code;
+    } catch { return generateSyncCode(); }
+  });
+
   // Pull-to-refresh state
   const pullStartY = useRef<number>(0);
   const [pullY, setPullY] = useState(0);
@@ -189,16 +200,6 @@ const App: React.FC = () => {
   const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
   const knownBuildTime = useRef<string>(typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '');
 
-  // Sync code — stable ID shared across devices
-  const [syncCode, setSyncCode] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(SYNC_KEY);
-      if (saved) return saved;
-      const code = generateSyncCode();
-      localStorage.setItem(SYNC_KEY, code);
-      return code;
-    } catch { return generateSyncCode(); }
-  });
   const [isSyncing, setIsSyncing] = useState(false);
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCloudTsRef = useRef<number>(0);
