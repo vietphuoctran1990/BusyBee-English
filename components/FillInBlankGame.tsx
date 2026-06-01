@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { XMarkIcon, CheckCircleIcon, TrophyIcon, StarIcon, SpeakerWaveIcon } from '@heroicons/react/24/solid';
 import { LearningItem, LanguageType } from '../types';
 import { speakWithBrowser, playSFX } from '../services/audioUtils';
+import { applySM2 } from '../utils/srs';
 
 interface FillInBlankGameProps {
   items: LearningItem[];
@@ -36,19 +37,6 @@ function pickQuestions(items: LearningItem[]): Question[] {
     const options = [answer, ...wrongs].sort(() => 0.5 - Math.random());
     return { item, sentence, answer, options };
   });
-}
-
-function applySM2(item: LearningItem, correct: boolean): Partial<LearningItem> {
-  const ef = item.srsEaseFactor ?? 2.5;
-  const interval = item.srsInterval ?? 0;
-  const newInterval = correct ? (interval === 0 ? 1 : interval === 1 ? 6 : Math.round(interval * ef)) : 1;
-  return {
-    srsInterval: newInterval,
-    srsEaseFactor: correct ? Math.min(3.0, ef + 0.1) : Math.max(1.3, ef - 0.2),
-    srsNextReview: Date.now() + newInterval * 86_400_000,
-    proficiency: correct ? Math.min(100, (item.proficiency ?? 0) + 10) : Math.max(0, (item.proficiency ?? 0) - 10),
-    updatedAt: Date.now(),
-  };
 }
 
 const FillInBlankGame: React.FC<FillInBlankGameProps> = ({ items, lang, onClose, onComplete }) => {

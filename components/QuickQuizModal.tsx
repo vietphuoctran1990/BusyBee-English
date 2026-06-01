@@ -4,6 +4,7 @@ import { XMarkIcon, StarIcon, TrophyIcon, SpeakerWaveIcon } from '@heroicons/rea
 import { LearningItem, LanguageType } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
 import { speakWithBrowser } from '../services/audioUtils';
+import { applySM2 } from '../utils/srs';
 
 interface QuickQuizModalProps {
   items: LearningItem[];
@@ -13,23 +14,6 @@ interface QuickQuizModalProps {
 }
 
 const QUIZ_SIZE = 5;
-
-function applySM2(item: LearningItem, correct: boolean): Partial<LearningItem> {
-  const ef = item.srsEaseFactor ?? 2.5;
-  let interval = item.srsInterval ?? 0;
-  const newInterval = correct
-    ? interval === 0 ? 1 : interval === 1 ? 6 : Math.round(interval * ef)
-    : 1;
-  return {
-    srsInterval: newInterval,
-    srsEaseFactor: correct ? Math.min(3.0, ef + 0.1) : Math.max(1.3, ef - 0.2),
-    srsNextReview: Date.now() + newInterval * 86_400_000,
-    proficiency: correct
-      ? Math.min(100, (item.proficiency ?? 0) + 10)
-      : Math.max(0, (item.proficiency ?? 0) - 10),
-    updatedAt: Date.now(),
-  };
-}
 
 const QuickQuizModal: React.FC<QuickQuizModalProps> = ({ items, lang, onClose, onComplete }) => {
   const t = TRANSLATIONS[lang];

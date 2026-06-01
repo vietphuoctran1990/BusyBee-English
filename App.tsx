@@ -39,8 +39,7 @@ const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
 const MemoryGameModal = lazy(() => import('./components/MemoryGameModal'));
 const FillInBlankGame = lazy(() => import('./components/FillInBlankGame'));
 const SentenceScrambleGame = lazy(() => import('./components/SentenceScrambleGame'));
-import { checkCodeExists, downloadData, uploadData } from './services/syncService';
-import { generateSyncCode } from './services/firebaseService';
+import { checkCodeExists, downloadData, uploadData, generateSyncCode } from './services/syncService';
 import {
   HeartIcon, HomeIcon, MagnifyingGlassIcon,
   TrophyIcon, StarIcon, BookOpenIcon,
@@ -657,6 +656,19 @@ const App: React.FC = () => {
 
   const topics = useMemo(() => Array.from(new Set(items.filter(i => i.isSaved).map(i => i.topic || 'General'))), [items]);
 
+  // Derived counts — memoized so they don't re-run .filter() on every render.
+  const savedItems = useMemo(() => items.filter(i => i.isSaved), [items]);
+  const savedCount = savedItems.length;
+  const topicCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const i of savedItems) {
+      const topic = i.topic || 'General';
+      counts.set(topic, (counts.get(topic) ?? 0) + 1);
+    }
+    return counts;
+  }, [savedItems]);
+  const masteredCount = useMemo(() => savedItems.filter(i => (i.proficiency ?? 0) >= 80).length, [savedItems]);
+
   const handleCreateMagicStory = async (words: LearningItem[]) => {
     setIsGeneratingStory(true);
     setIsSelectingForStory(false);
@@ -859,7 +871,10 @@ const App: React.FC = () => {
 
   const today = new Date().toISOString().split('T')[0];
   const dailyChallengeAlreadyDone = stats.lastChallengeDate === today;
-  const srsReviewCount = items.filter(i => i.isSaved && (!i.srsNextReview || i.srsNextReview <= Date.now())).length;
+  const srsReviewCount = useMemo(
+    () => savedItems.filter(i => !i.srsNextReview || i.srsNextReview <= Date.now()).length,
+    [savedItems],
+  );
 
   return (
     <div
@@ -1517,7 +1532,7 @@ const App: React.FC = () => {
                     onClick={() => setActiveSavedTopic(null)}
                     className={`px-5 py-2.5 rounded-[1.5rem] font-black text-sm md:text-base transition-all ${activeSavedTopic === null ? 'bg-blue-500 text-white shadow-lg border-2 border-blue-300' : 'bg-white text-blue-400 border-2 border-blue-50 hover:bg-blue-50'}`}
                   >
-                    Tất cả ({items.filter(i => i.isSaved).length})
+                    Tất cả ({savedCount})
                   </button>
                   {topics.map(topic => (
                     <button
@@ -1525,7 +1540,7 @@ const App: React.FC = () => {
                       onClick={() => setActiveSavedTopic(topic)}
                       className={`px-5 py-2.5 rounded-[1.5rem] font-black text-sm md:text-base transition-all ${activeSavedTopic === topic ? 'bg-blue-500 text-white shadow-lg border-2 border-blue-300' : 'bg-white text-blue-400 border-2 border-blue-50 hover:bg-blue-50'}`}
                     >
-                      {topic} ({items.filter(i => i.isSaved && (i.topic || 'General') === topic).length})
+                      {topic} ({topicCounts.get(topic) ?? 0})
                     </button>
                   ))}
                 </div>
@@ -1617,7 +1632,7 @@ const App: React.FC = () => {
               {isSelectingForStory ? (
                 <Suspense fallback={<ModalFallback />}>
                   <StoryCreationSetup
-                    savedItems={items.filter(i => i.isSaved)}
+                    savedItems={savedItems}
                     onConfirm={handleCreateMagicStory}
                     onCancel={() => setIsSelectingForStory(false)}
                     lang={settings.language}
@@ -1723,7 +1738,7 @@ const App: React.FC = () => {
                 <div className="clay-card flex items-center gap-3 px-4 py-3 bg-blue-50 border-blue-100 shadow-sm">
                   <BookOpenIcon className="w-6 h-6 text-blue-500" />
                   <div>
-                    <p className="font-black text-blue-700 text-lg leading-none">{items.filter(i => i.isSaved && (i.proficiency ?? 0) >= 80).length}</p>
+                    <p className="font-black text-blue-700 text-lg leading-none">{masteredCount}</p>
                     <p className="text-blue-400 text-xs font-bold">{settings.language === 'vn' ? 'từ thành thạo' : 'mastered'}</p>
                   </div>
                 </div>
@@ -1801,7 +1816,7 @@ const App: React.FC = () => {
                 </button>
               </div>
               <PracticeSetup
-                savedItems={items.filter(i => i.isSaved)}
+                savedItems={savedItems}
                 onStartGame={(selected, type) => { setPracticeGame({ active: true, items: selected, type }); playSFX('click'); }}
                 onCancel={() => setView('create')}
                 lang={settings.language}

@@ -2,6 +2,12 @@ import { LearningItem, StoryData, UserStats } from '../types';
 
 const BASE = '/api/sync';
 
+/** Generate a 6-char alphanumeric sync code (no ambiguous chars like O/0/I/1). */
+export const generateSyncCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+};
+
 export interface SyncData {
   items: LearningItem[];
   stories: StoryData[];

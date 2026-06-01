@@ -32,7 +32,11 @@ function writeQueue(actions: QueuedAction[]) {
   } catch {}
 }
 
-export function enqueueAction(action: Omit<QueuedAction, 'ts'> & { ts?: number }) {
+// Distributive Omit preserves the discriminated union so `action.type` narrows correctly.
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+type QueuedActionInput = DistributiveOmit<QueuedAction, 'ts'> & { ts?: number };
+
+export function enqueueAction(action: QueuedActionInput) {
   const queue = readQueue();
   // Coalesce: if the same item gets updated multiple times, merge patches
   if (action.type === 'update_item') {

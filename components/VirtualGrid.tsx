@@ -61,12 +61,19 @@ export function VirtualGrid<T>({
       const end = Math.min(items.length, lastRow * cols);
       setRange(prev => prev.start === start && prev.end === end ? prev : { start, end });
     };
+    // Throttle scroll/resize work to one computation per animation frame.
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => { rafId = null; compute(); });
+    };
     compute();
-    window.addEventListener('scroll', compute, { passive: true });
-    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
     return () => {
-      window.removeEventListener('scroll', compute);
-      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [cols, items.length, overscan, rowHeight]);
 

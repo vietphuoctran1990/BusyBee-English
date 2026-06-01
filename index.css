@@ -306,4 +306,35 @@
     box-shadow: inset 4px 4px 8px rgba(0,0,0,0.3), inset -4px -4px 8px rgba(255,255,255,0.02) !important;
     border-color: #334155 !important;
   }
+
+  /* Soften bright brand surfaces inside dark mode so modals don't glare. */
+  html[data-dark] .bg-blue-600 { background-color: #1d4ed8 !important; }
+  html[data-dark] .bg-indigo-50 { background-color: #1e2d4a !important; }
+  html[data-dark] .bg-indigo-100 { background-color: #283655 !important; }
+
+  /* Keyboard focus visibility — clear ring for tab navigation (kids/parents on tablets w/ keyboards, a11y). */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 3px solid #3B82F6;
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+}
+
+/* ── Respect reduced-motion preference (WCAG 2.3.3) ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-float,
+  .bee-happy, .bee-sad, .bee-celebrate, .bee-thinking,
+  .bee-star-1, .bee-star-2, .bee-star-3, .bee-think-bubble {
+    animation: none !important;
+  }
 }

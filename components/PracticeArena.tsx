@@ -4,6 +4,7 @@ import { LearningItem, GameType, LanguageType } from '../types';
 import { SpeakerWaveIcon, CheckCircleIcon, XCircleIcon, TrophyIcon, MicrophoneIcon, StarIcon, XMarkIcon, LanguageIcon, ArrowPathIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { speakWithBrowser, playSFX } from '../services/audioUtils';
 import { TRANSLATIONS } from '../utils/translations';
+import { applySM2 } from '../utils/srs';
 import BeeAvatar, { BeeMood } from './BeeAvatar';
 
 interface PracticeArenaProps {
@@ -20,31 +21,6 @@ const haptic = (pattern: number | number[]) => {
   try { navigator.vibrate?.(pattern); } catch {}
 };
 
-// SM-2 spaced repetition update
-function applySM2(item: LearningItem, correct: boolean): Partial<LearningItem> {
-  const easeFactor = item.srsEaseFactor ?? 2.5;
-  let interval = item.srsInterval ?? 0;
-  let newEase = easeFactor;
-  let newInterval: number;
-  if (correct) {
-    if (interval === 0) newInterval = 1;
-    else if (interval === 1) newInterval = 6;
-    else newInterval = Math.round(interval * easeFactor);
-    newEase = Math.min(3.0, easeFactor + 0.1);
-  } else {
-    newInterval = 1;
-    newEase = Math.max(1.3, easeFactor - 0.2);
-  }
-  return {
-    srsInterval: newInterval,
-    srsEaseFactor: newEase,
-    srsNextReview: Date.now() + newInterval * 86_400_000,
-    proficiency: correct
-      ? Math.min(100, (item.proficiency ?? 0) + 10)
-      : Math.max(0, (item.proficiency ?? 0) - 10),
-    updatedAt: Date.now(),
-  };
-}
 
 const PracticeArena: React.FC<PracticeArenaProps> = ({ items, gameType, allItems, onExit, lang, starsMultiplier = 1 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
