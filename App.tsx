@@ -8,7 +8,7 @@ import IntroModal from './components/IntroModal';
 import LoginScreen from './components/LoginScreen';
 import NotificationPrompt from './components/NotificationPrompt';
 const isFocusModeLocked = (): boolean => {
-  try { return !!localStorage.getItem('busybee_focus_pin'); } catch { return false; }
+  try { return !!localStorage.getItem(STORAGE_KEYS.FOCUS_PIN); } catch { return false; }
 };
 
 // Code-split heavy modals so they don't bloat the initial bundle
@@ -48,6 +48,7 @@ import {
   FunnelIcon, FireIcon, ChartBarIcon, CloudArrowUpIcon, BoltIcon, ShieldCheckIcon,
 } from '@heroicons/react/24/solid';
 import { TRANSLATIONS } from './utils/translations';
+import { STORAGE_KEYS } from './utils/storageKeys';
 import { playSFX } from './services/audioUtils';
 import { useSettings } from './hooks/useSettings';
 import { useStats } from './hooks/useStats';
@@ -55,12 +56,12 @@ import { useDebounce } from './hooks/useDebounce';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 
-const USER_KEY = 'kidlingo_user_clay_v2';
-const STATS_KEY = 'kidlingo_stats_clay_v2';
-const SETTINGS_KEY = 'kidlingo_settings_clay_v2';
-const NOTIF_KEY = 'busybee_notif_prefs';
-const SYNC_KEY = 'busybee_sync_code';
-const DECKS_KEY = 'busybee_decks_v1';
+const USER_KEY = STORAGE_KEYS.USER;
+const STATS_KEY = STORAGE_KEYS.STATS;
+const SETTINGS_KEY = STORAGE_KEYS.SETTINGS;
+const NOTIF_KEY = STORAGE_KEYS.NOTIF;
+const SYNC_KEY = STORAGE_KEYS.SYNC;
+const DECKS_KEY = STORAGE_KEYS.DECKS;
 
 type SortOrder = 'newest' | 'oldest' | 'alpha';
 

@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { XMarkIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 import { LanguageType } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const FOCUS_PIN_KEY = 'busybee_focus_pin';
+const FOCUS_PIN_KEY = STORAGE_KEYS.FOCUS_PIN;
 
 interface FocusModeSetupProps {
   lang: LanguageType;

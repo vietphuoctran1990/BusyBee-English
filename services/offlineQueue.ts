@@ -3,8 +3,9 @@
 // Each action is idempotent enough that replaying once is safe.
 
 import { LearningItem, StoryData, UserStats } from '../types';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const QUEUE_KEY = 'busybee_offline_queue_v1';
+const QUEUE_KEY = STORAGE_KEYS.OFFLINE_QUEUE;
 
 export type QueuedAction =
   | { type: 'add_item'; item: LearningItem; ts: number }

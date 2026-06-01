@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import { AppSettings } from '../types';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const SETTINGS_KEY = 'kidlingo_settings_clay_v2';
+const SETTINGS_KEY = STORAGE_KEYS.SETTINGS;
 
 const DEFAULT_SETTINGS: AppSettings = { accent: 'US', language: 'vn' };
 

@@ -4,6 +4,7 @@ import { XMarkIcon, UserCircleIcon, GlobeAltIcon, SpeakerWaveIcon, CheckIcon, Id
 import { StarIcon } from '@heroicons/react/24/solid';
 import { UserProfile, AppSettings, LanguageType, AccentType, UserStats } from '../types';
 import { TRANSLATIONS } from '../utils/translations';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
 interface SettingsModalProps {
   user: UserProfile;
@@ -29,7 +30,7 @@ const AVATARS = [
   '🍓', '🍕', '🍦', '🍭', '🍩', '🎨', '🎸', '⚽', '🎮', '🧘‍♂️', '🧗‍♀️', '☕', '💼',
 ];
 
-const NOTIF_KEY = 'busybee_notif_prefs';
+const NOTIF_KEY = STORAGE_KEYS.NOTIF;
 const HOUR_OPTIONS = [7, 8, 9, 12, 15, 17, 19, 20, 21];
 
 function formatHour(h: number) {

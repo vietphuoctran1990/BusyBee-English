@@ -6,8 +6,9 @@ import {
   LockClosedIcon, ShieldCheckIcon,
 } from '@heroicons/react/24/solid';
 import { LearningItem, UserStats, LanguageType, StoryData } from '../types';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const PARENT_PIN_KEY = 'busybee_parent_pin';
+const PARENT_PIN_KEY = STORAGE_KEYS.PARENT_PIN;
 
 interface ParentDashboardProps {
   stats: UserStats;

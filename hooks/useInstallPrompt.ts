@@ -1,7 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const DISMISS_KEY = 'busybee_install_dismissed_at';
+const DISMISS_KEY = STORAGE_KEYS.INSTALL_DISMISSED;
 const DISMISS_DAYS = 14;
 
 export function useInstallPrompt() {

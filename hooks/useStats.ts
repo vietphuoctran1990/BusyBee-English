@@ -4,8 +4,9 @@ import { UserStats, UserProfile } from '../types';
 import { playSFX } from '../services/audioUtils';
 import { TRANSLATIONS } from '../utils/translations';
 import { LanguageType } from '../types';
+import { STORAGE_KEYS } from '../utils/storageKeys';
 
-const STATS_KEY = 'kidlingo_stats_clay_v2';
+const STATS_KEY = STORAGE_KEYS.STATS;
 
 const DEFAULT_STATS: UserStats = {
   totalTimeSeconds: 0,
