@@ -101,7 +101,7 @@ const SlideshowModal: React.FC<SlideshowModalProps> = ({ items, onClose, lang })
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
-          <button onClick={onClose} className="p-2.5 bg-white/20 hover:bg-white/30 rounded-full text-white">
+          <button onClick={onClose} aria-label="Đóng" className="p-2.5 bg-white/20 hover:bg-white/30 rounded-full text-white">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>

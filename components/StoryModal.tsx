@@ -221,7 +221,7 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
               <p className="text-indigo-200 text-xs font-black uppercase tracking-widest mb-0.5">{lang === 'vn' ? 'Kiểm tra từ vựng' : 'Vocabulary Quiz'}</p>
               <h2 className="text-xl font-black">{quizDone ? (lang === 'vn' ? 'Xong rồi! 🎉' : 'All done! 🎉') : `${quizIndex + 1} / ${quizWords.length}`}</h2>
             </div>
-            <button onClick={onClose} className="p-2 bg-white/20 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
+            <button onClick={onClose} aria-label="Đóng" className="p-2 bg-white/20 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
           </div>
 
           {quizDone ? (
@@ -294,7 +294,7 @@ const StoryModal: React.FC<StoryModalProps> = ({ data, onClose, onSave, isSaved 
                         <HeartIcon className="w-3.5 h-3.5" /> Lưu
                       </button>
                     )}
-                    <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-full transition-all min-h-[36px] min-w-[36px] flex items-center justify-center">
+                    <button onClick={onClose} aria-label="Đóng" className="p-2 bg-gray-100 hover:bg-red-50 hover:text-red-500 rounded-full transition-all min-h-[36px] min-w-[36px] flex items-center justify-center">
                       <XMarkIcon className="w-4 h-4" />
                     </button>
                 </div>

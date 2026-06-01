@@ -138,7 +138,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
         <div className="bg-indigo-600 p-4 md:p-8 flex justify-between items-center text-white shrink-0 pt-safe">
             <div className="flex items-center gap-3 md:gap-6">
                 {!fullView ? (
-                  <button onClick={onClose} className="p-2 bg-white/20 rounded-full md:hidden"><ArrowLeftIcon className="w-6 h-6"/></button>
+                  <button onClick={onClose} aria-label="Quay lại" className="p-2 bg-white/20 rounded-full md:hidden"><ArrowLeftIcon className="w-6 h-6"/></button>
                 ) : null}
                 <BeeAvatar mood={beeMood} size="md" className="shrink-0" />
                 <div className="min-w-0">
@@ -148,7 +148,7 @@ const AIFriendModal: React.FC<AIFriendModalProps> = ({ onClose, lang, items = []
                     </p>
                 </div>
             </div>
-            {!fullView && <button onClick={onClose} className="hidden md:block p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"><XMarkIcon className="w-8 h-8"/></button>}
+            {!fullView && <button onClick={onClose} aria-label="Đóng" className="hidden md:block p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"><XMarkIcon className="w-8 h-8"/></button>}
         </div>
 
         <div className="flex bg-indigo-50/50 p-1 md:p-2 border-b border-indigo-100 shrink-0">

@@ -42,7 +42,7 @@ const IntroModal: React.FC<IntroModalProps> = ({ onClose, lang }) => {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-blue-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="bg-white w-full max-w-2xl rounded-[2.5rem] md:rounded-[3rem] shadow-2xl overflow-hidden animate-scale-up border-4 border-white relative flex flex-col max-h-[90vh] md:max-h-[85vh]" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 md:top-6 md:right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors z-30">
+        <button onClick={onClose} aria-label="Đóng" className="absolute top-4 right-4 md:top-6 md:right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors z-30">
             <XMarkIcon className="w-6 h-6" />
         </button>
 

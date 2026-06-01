@@ -77,7 +77,7 @@ const DeckManagerModal: React.FC<DeckManagerModalProps> = ({
           ) : (
             <h2 className="text-xl font-black text-blue-900">{t.deckManage}</h2>
           )}
-          <button onClick={onClose} className="p-2 bg-gray-100 rounded-xl text-gray-400 hover:bg-gray-200 transition-all">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 bg-gray-100 rounded-xl text-gray-400 hover:bg-gray-200 transition-all">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>

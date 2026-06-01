@@ -168,7 +168,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <h2 className="text-2xl font-black flex items-center gap-2">
             <GlobeAltIcon className="w-8 h-8 text-blue-200" /> {t.settings}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 hover:bg-white/20 rounded-full transition-colors">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>

@@ -48,7 +48,7 @@ export const FocusModeSetup: React.FC<FocusModeSetupProps> = ({ lang, onClose, o
             <LockClosedIcon className="w-6 h-6" />
             <h2 className="font-black text-lg">{t.focusMode}</h2>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 hover:bg-white/20 rounded-full">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>

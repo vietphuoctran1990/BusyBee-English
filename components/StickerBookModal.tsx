@@ -38,7 +38,7 @@ const StickerBookModal: React.FC<StickerBookModalProps> = ({ stars, unlockedStic
                   <StarIcon className="w-6 h-6 text-yellow-700" />
                   <span className="text-xl font-black text-yellow-900">{stars}</span>
               </div>
-              <button onClick={onClose} className="p-2 bg-white/30 hover:bg-white/50 rounded-full text-yellow-900 transition-colors">
+              <button onClick={onClose} aria-label="Đóng" className="p-2 bg-white/30 hover:bg-white/50 rounded-full text-yellow-900 transition-colors">
                 <XMarkIcon className="w-6 h-6" />
               </button>
           </div>

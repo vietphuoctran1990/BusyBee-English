@@ -49,6 +49,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { TRANSLATIONS } from './utils/translations';
 import { STORAGE_KEYS } from './utils/storageKeys';
+import { logError } from './utils/log';
 import { playSFX } from './services/audioUtils';
 import { useSettings } from './hooks/useSettings';
 import { useStats } from './hooks/useStats';
@@ -243,7 +244,7 @@ const App: React.FC = () => {
         // Add cloud-only items not present locally
         const cloudOnly = cloud.items.filter(i => !localIds.has(i.id));
         const result = [...merged, ...cloudOnly].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        saveItemsToDB(result).catch(() => {});
+        saveItemsToDB(result).catch(e => logError('saveItemsToDB', e));
         return result;
       });
     }
@@ -298,7 +299,7 @@ const App: React.FC = () => {
                 items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
                 stories: storiesRef.current,
                 stats: statsRef.current,
-              }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
+              }).then(() => { lastPushAtRef.current = Date.now(); }).catch(e => logError('cloud push', e));
             }, 500);
           }
         } else if (localItems.length) {
@@ -307,7 +308,7 @@ const App: React.FC = () => {
             items: localItems.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
             stories: localStories,
             stats: statsRef.current,
-          }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
+          }).then(() => { lastPushAtRef.current = Date.now(); }).catch(e => logError('cloud push', e));
         }
       }).catch(() => setIsSyncing(false));
     });
@@ -426,7 +427,7 @@ const App: React.FC = () => {
         items: itemsRef.current.map(({ loading, isRegeneratingImage, isRegeneratingAudio, error, ...i }: any) => i),
         stories: storiesRef.current,
         stats: statsRef.current,
-      }).then(() => { lastPushAtRef.current = Date.now(); }).catch(() => {});
+      }).then(() => { lastPushAtRef.current = Date.now(); }).catch(e => logError('cloud push', e));
     }, 1000);
   }, [syncCode]);
 
@@ -549,7 +550,7 @@ const App: React.FC = () => {
           if (families.length > 0 && !deletedItemIds.current.has(itemId)) {
             const withFamilies = { ...finalItem, wordFamilies: families };
             setItems(prev => prev.map(i => i.id === itemId ? withFamilies : i));
-            saveItemsToDB([withFamilies]).catch(() => {});
+            saveItemsToDB([withFamilies]).catch(e => logError('saveItemsToDB', e));
           }
         });
       }
@@ -836,7 +837,7 @@ const App: React.FC = () => {
               const update = (res as any[]).find((r: any) => r.itemId === item.id);
               if (!update?.srsUpdate) return item;
               const updated = { ...item, ...update.srsUpdate };
-              saveItemsToDB([updated]).catch(() => {});
+              saveItemsToDB([updated]).catch(e => logError('saveItemsToDB', e));
               return updated;
             }));
             scheduleCloudPush();
@@ -1027,7 +1028,7 @@ const App: React.FC = () => {
                 const u = srsUpdates.find(r => r.itemId === item.id);
                 if (!u) return item;
                 const updated = { ...item, ...u.update };
-                saveItemsToDB([updated]).catch(() => {});
+                saveItemsToDB([updated]).catch(e => logError('saveItemsToDB', e));
                 return updated;
               }));
               scheduleCloudPush();
@@ -1050,7 +1051,7 @@ const App: React.FC = () => {
                 const u = srsUpdates.find(r => r.itemId === item.id);
                 if (!u) return item;
                 const updated = { ...item, ...u.update };
-                saveItemsToDB([updated]).catch(() => {});
+                saveItemsToDB([updated]).catch(e => logError('saveItemsToDB', e));
                 return updated;
               }));
               scheduleCloudPush();
@@ -1101,7 +1102,7 @@ const App: React.FC = () => {
                 const u = srsUpdates.find(r => r.itemId === item.id);
                 if (!u) return item;
                 const updated = { ...item, ...u.update };
-                saveItemsToDB([updated]).catch(() => {});
+                saveItemsToDB([updated]).catch(e => logError('saveItemsToDB', e));
                 return updated;
               }));
               scheduleCloudPush();

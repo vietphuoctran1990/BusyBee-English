@@ -74,7 +74,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ stats, items, lang, onClose }) 
             <ChartBarIcon className="w-7 h-7 text-blue-200" />
             {t.statsScreen}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 hover:bg-white/20 rounded-full transition-colors">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>

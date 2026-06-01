@@ -129,7 +129,7 @@ const MemoryGameModal: React.FC<MemoryGameModalProps> = ({ items, lang, onClose,
               {lang === 'vn' ? `Lượt ${moves} · Đã ghép ${matched.size}/${PAIRS}` : `Moves ${moves} · Matched ${matched.size}/${PAIRS}`}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white/20 rounded-full">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 bg-white/20 rounded-full">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>

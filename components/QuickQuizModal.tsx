@@ -122,7 +122,7 @@ const QuickQuizModal: React.FC<QuickQuizModalProps> = ({ items, lang, onClose, o
               <StarIcon className="w-4 h-4 text-yellow-300" />
               <span className="font-black text-sm">{score}</span>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+            <button onClick={onClose} aria-label="Đóng" className="p-2 hover:bg-white/20 rounded-full transition-colors">
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>

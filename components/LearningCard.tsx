@@ -78,6 +78,7 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(item.id); }}
+              aria-label={lang === 'vn' ? 'Sửa thẻ' : 'Edit card'}
               className="p-2.5 bg-white/95 rounded-xl text-blue-500 hover:scale-110 shadow-lg transition-all border-2 border-blue-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <PencilSquareIcon className="w-5 h-5" />
@@ -94,6 +95,8 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSave(item.id); }}
+              aria-label={item.isSaved ? (lang === 'vn' ? 'Bỏ lưu' : 'Unsave') : (lang === 'vn' ? 'Lưu thẻ' : 'Save card')}
+              aria-pressed={item.isSaved}
               className={`p-2.5 rounded-xl shadow-lg transition-all border-2 min-h-[44px] min-w-[44px] flex items-center justify-center ${item.isSaved ? 'bg-pink-500 text-white border-pink-400' : 'bg-white/95 text-pink-400 border-pink-100'}`}
             >
               {item.isSaved ? <HeartIconSolid className="w-5 h-5" /> : <HeartIconOutline className="w-5 h-5" />}
@@ -102,6 +105,7 @@ const LearningCard: React.FC<LearningCardProps> = ({ item, onDelete, onRetry, on
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+          aria-label={lang === 'vn' ? 'Xoá thẻ' : 'Delete card'}
           className="p-2.5 bg-white/95 rounded-xl text-gray-400 hover:text-red-500 shadow-lg transition-all border-2 border-gray-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           <TrashIcon className="w-5 h-5" />

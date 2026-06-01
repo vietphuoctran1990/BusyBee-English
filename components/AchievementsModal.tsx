@@ -36,7 +36,7 @@ const AchievementsModal: React.FC<AchievementsModalProps> = ({ stats, items, sto
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all">
+          <button onClick={onClose} aria-label="Đóng" className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>

@@ -117,7 +117,7 @@ const FillInBlankGame: React.FC<FillInBlankGameProps> = ({ items, lang, onClose,
             <h2 className="text-lg font-black">{lang === 'vn' ? 'Điền từ vào chỗ trống' : 'Fill in the Blank'}</h2>
             <p className="text-green-100 text-xs font-bold">{index + 1} / {questions.length} · ⭐ {score}</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white/20 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Đóng" className="p-2 bg-white/20 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
         </div>
         <div className="h-2 bg-green-100"><div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${((index + 1) / questions.length) * 100}%` }} /></div>
 

@@ -37,7 +37,7 @@ const EditCardModal: React.FC<EditCardModalProps> = ({ item, onClose, onSave, la
           <h3 className="text-white font-black text-xl flex items-center gap-2">
             <PencilSquareIcon className="w-6 h-6" /> {t.editCard}
           </h3>
-          <button onClick={onClose} className="text-indigo-200 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Đóng" className="text-indigo-200 hover:text-white transition-colors">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>

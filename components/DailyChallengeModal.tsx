@@ -45,7 +45,7 @@ const DailyChallengeModal: React.FC<DailyChallengeModalProps> = ({
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-yellow-400 px-6 py-5 text-white relative overflow-hidden">
           <div className="absolute -top-4 -right-4 text-7xl opacity-20">🔥</div>
-          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 hover:bg-white/20 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Đóng" className="absolute top-4 right-4 p-1.5 hover:bg-white/20 rounded-full transition-colors">
             <XMarkIcon className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3 mb-1">
