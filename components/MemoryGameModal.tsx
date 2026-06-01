@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { XMarkIcon, TrophyIcon, StarIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon, TrophyIcon, StarIcon } from '@heroicons/react/24/solid';
 import { LearningItem, LanguageType } from '../types';
 import { speakWithBrowser, playSFX } from '../services/audioUtils';
+import { GameEmptyState } from './GameScreens';
 
 interface MemoryGameModalProps {
   items: LearningItem[];
@@ -49,20 +50,13 @@ const MemoryGameModal: React.FC<MemoryGameModalProps> = ({ items, lang, onClose,
 
   if (eligible.length < PAIRS) {
     return (
-      <div className="fixed inset-0 z-[200] bg-blue-900/70 backdrop-blur-md flex items-center justify-center p-5 animate-fade-in">
-        <div className="bg-white p-8 max-w-sm w-full rounded-3xl text-center animate-scale-up">
-          <div className="text-5xl mb-4">📚</div>
-          <h3 className="text-xl font-black text-blue-900 mb-2">
-            {lang === 'vn' ? 'Chưa đủ thẻ' : 'Not enough cards'}
-          </h3>
-          <p className="text-blue-400 font-bold text-sm mb-6">
-            {lang === 'vn' ? `Cần ít nhất ${PAIRS} thẻ đã lưu để chơi` : `Need at least ${PAIRS} saved cards to play`}
-          </p>
-          <button onClick={onClose} className="w-full py-3 bg-blue-500 text-white font-black rounded-2xl">
-            {lang === 'vn' ? 'Đóng' : 'Close'}
-          </button>
-        </div>
-      </div>
+      <GameEmptyState
+        emoji="📚"
+        title={lang === 'vn' ? 'Chưa đủ thẻ' : 'Not enough cards'}
+        message={lang === 'vn' ? `Cần ít nhất ${PAIRS} thẻ đã lưu để chơi` : `Need at least ${PAIRS} saved cards to play`}
+        closeLabel={lang === 'vn' ? 'Đóng' : 'Close'}
+        onClose={onClose}
+      />
     );
   }
 

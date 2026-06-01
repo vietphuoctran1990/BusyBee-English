@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { XMarkIcon, TrophyIcon, StarIcon, SpeakerWaveIcon, ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
+import { XMarkIcon, SpeakerWaveIcon, ArrowUturnLeftIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import { LearningItem, LanguageType } from '../types';
 import { speakWithBrowser, playSFX } from '../services/audioUtils';
 import { applySM2 } from '../utils/srs';
+import { GameEmptyState, GameResultScreen } from './GameScreens';
 
 interface Props {
   items: LearningItem[];
@@ -77,18 +78,13 @@ const SentenceScrambleGame: React.FC<Props> = ({ items, lang, listenMode = false
 
   if (questions.length === 0) {
     return (
-      <div className="fixed inset-0 z-[200] bg-blue-900/70 backdrop-blur-md flex items-center justify-center p-5 animate-fade-in">
-        <div className="bg-white p-8 max-w-sm w-full rounded-3xl text-center animate-scale-up">
-          <div className="text-5xl mb-3">📝</div>
-          <h3 className="text-xl font-black text-blue-900 mb-2">
-            {lang === 'vn' ? 'Chưa đủ câu' : 'Not enough sentences'}
-          </h3>
-          <p className="text-blue-400 font-bold text-sm mb-6">
-            {lang === 'vn' ? 'Cần thẻ đã lưu có câu ví dụ 3-8 từ' : 'Need saved cards with 3-8 word example sentences'}
-          </p>
-          <button onClick={onClose} className="w-full py-3 bg-blue-500 text-white font-black rounded-2xl">{lang === 'vn' ? 'Đóng' : 'Close'}</button>
-        </div>
-      </div>
+      <GameEmptyState
+        emoji="📝"
+        title={lang === 'vn' ? 'Chưa đủ câu' : 'Not enough sentences'}
+        message={lang === 'vn' ? 'Cần thẻ đã lưu có câu ví dụ 3-8 từ' : 'Need saved cards with 3-8 word example sentences'}
+        closeLabel={lang === 'vn' ? 'Đóng' : 'Close'}
+        onClose={onClose}
+      />
     );
   }
 
@@ -132,18 +128,14 @@ const SentenceScrambleGame: React.FC<Props> = ({ items, lang, listenMode = false
   if (done) {
     const stars = Math.ceil(score / 2);
     return (
-      <div className="fixed inset-0 z-[200] bg-blue-900/70 backdrop-blur-md flex items-center justify-center p-5 animate-fade-in">
-        <div className="bg-white p-8 max-w-sm w-full rounded-3xl text-center animate-scale-up">
-          <TrophyIcon className="w-16 h-16 text-yellow-400 mx-auto mb-3 animate-bounce" />
-          <h3 className="text-2xl font-black text-blue-900 mb-2">{lang === 'vn' ? 'Tuyệt!' : 'Great!'}</h3>
-          <p className="text-blue-400 font-bold mb-4">{score}/{questions.length} {lang === 'vn' ? 'đúng' : 'correct'}</p>
-          <div className="flex items-center justify-center gap-2 bg-yellow-50 rounded-2xl p-3 mb-6">
-            <StarIcon className="w-7 h-7 text-yellow-500" />
-            <span className="text-xl font-black text-yellow-700">+{stars} {lang === 'vn' ? 'sao' : 'stars'}</span>
-          </div>
-          <button onClick={() => onComplete(stars, srsUpdates)} className="w-full py-4 bg-blue-500 text-white font-black rounded-2xl shadow-lg">{lang === 'vn' ? 'Nhận thưởng' : 'Claim'}</button>
-        </div>
-      </div>
+      <GameResultScreen
+        title={lang === 'vn' ? 'Tuyệt!' : 'Great!'}
+        scoreLabel={`${score}/${questions.length} ${lang === 'vn' ? 'đúng' : 'correct'}`}
+        stars={stars}
+        starsLabel={lang === 'vn' ? 'sao' : 'stars'}
+        claimLabel={lang === 'vn' ? 'Nhận thưởng' : 'Claim'}
+        onClaim={() => onComplete(stars, srsUpdates)}
+      />
     );
   }
 
