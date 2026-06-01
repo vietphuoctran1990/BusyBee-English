@@ -56,42 +56,15 @@ import { useStats } from './hooks/useStats';
 import { useDebounce } from './hooks/useDebounce';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
+import { useAppUpdate } from './hooks/useAppUpdate';
+import { useNotificationPrompt } from './hooks/useNotificationPrompt';
+import { ALL_STICKERS } from './utils/stickers';
 
 const USER_KEY = STORAGE_KEYS.USER;
-const STATS_KEY = STORAGE_KEYS.STATS;
-const SETTINGS_KEY = STORAGE_KEYS.SETTINGS;
-const NOTIF_KEY = STORAGE_KEYS.NOTIF;
 const SYNC_KEY = STORAGE_KEYS.SYNC;
 const DECKS_KEY = STORAGE_KEYS.DECKS;
 
 type SortOrder = 'newest' | 'oldest' | 'alpha';
-
-const ALL_STICKERS: Sticker[] = [
-  { id: 'p1', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png', name: 'Pikachu', cost: 10, bg: 'bg-yellow-100' },
-  { id: 'p2', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png', name: 'Charmander', cost: 15, bg: 'bg-orange-100' },
-  { id: 'p3', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png', name: 'Squirtle', cost: 15, bg: 'bg-blue-100' },
-  { id: 'p4', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png', name: 'Bulbasaur', cost: 15, bg: 'bg-green-100' },
-  { id: 'p5', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png', name: 'Eevee', cost: 20, bg: 'bg-amber-100' },
-  { id: 'p6', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/150.png', name: 'Mewtwo', cost: 50, bg: 'bg-purple-100' },
-  { id: 'p7', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/151.png', name: 'Mew', cost: 45, bg: 'bg-pink-100' },
-  { id: 'p8', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/52.png', name: 'Meowth', cost: 12, bg: 'bg-stone-100' },
-  { id: 'p9', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/39.png', name: 'Jigpuff', cost: 18, bg: 'bg-rose-50' },
-  { id: 'p10', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png', name: 'Snorlax', cost: 30, bg: 'bg-teal-50' },
-  { id: 'p11', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png', name: 'Charizard', cost: 60, bg: 'bg-orange-200' },
-  { id: 'p12', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/9.png', name: 'Blastoise', cost: 55, bg: 'bg-blue-200' },
-  { id: 'p13', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png', name: 'Venusaur', cost: 55, bg: 'bg-green-200' },
-  { id: 'p14', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png', name: 'Psyduck', cost: 14, bg: 'bg-yellow-50' },
-  { id: 'p15', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/58.png', name: 'Growlithe', cost: 22, bg: 'bg-orange-50' },
-  { id: 'p16', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/63.png', name: 'Abra', cost: 25, bg: 'bg-yellow-100' },
-  { id: 'p17', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/77.png', name: 'Ponyta', cost: 28, bg: 'bg-red-50' },
-  { id: 'p18', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/92.png', name: 'Gastly', cost: 30, bg: 'bg-purple-50' },
-  { id: 'p19', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/95.png', name: 'Onix', cost: 35, bg: 'bg-gray-100' },
-  { id: 'p20', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/131.png', name: 'Lapras', cost: 40, bg: 'bg-sky-100' },
-  { id: 'p21', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/147.png', name: 'Dratini', cost: 38, bg: 'bg-blue-50' },
-  { id: 'p22', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png', name: 'Dragonite', cost: 65, bg: 'bg-orange-100' },
-  { id: 'p23', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/175.png', name: 'Togepi', cost: 20, bg: 'bg-stone-50' },
-  { id: 'p24', imageUrl: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/196.png', name: 'Espeon', cost: 45, bg: 'bg-purple-100' },
-];
 
 const ModalFallback: React.FC = () => (
   <div className="fixed inset-0 z-[300] flex items-center justify-center bg-blue-900/40 backdrop-blur-sm">
@@ -131,8 +104,6 @@ const App: React.FC = () => {
   const [practiceGame, setPracticeGame] = useState<{ active: boolean; type: GameType; items: LearningItem[] }>({ active: false, type: 'listening', items: [] });
   const [hasCustomKey, setHasCustomKey] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
-  const notifPromptShownRef = useRef(false);
 
   // Sync code — stable ID shared across devices (declared early so pull-to-refresh can use it)
   const [syncCode, setSyncCode] = useState<string>(() => {
@@ -196,10 +167,8 @@ const App: React.FC = () => {
   const [showDeckManager, setShowDeckManager] = useState(false);
   const [activeDeck, setActiveDeck] = useState<string | null>(null);
 
-  // App update detection
-  const [showUpdateToast, setShowUpdateToast] = useState(false);
-  const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
-  const knownBuildTime = useRef<string>(typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : '');
+  // App update detection (waiting SW + version.json polling)
+  const { updateReady, applyUpdate, dismissUpdate } = useAppUpdate(!!currentUser);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -223,6 +192,11 @@ const App: React.FC = () => {
     if (globalErrorTimerRef.current) clearTimeout(globalErrorTimerRef.current);
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 6000);
   }, []);
+
+  // Daily-reminder notification opt-in flow
+  const onNotifGranted = useCallback(() => showGlobalError(t.notifGranted), [showGlobalError, t.notifGranted]);
+  const { showPrompt: showNotifPrompt, confirm: handleNotifConfirm, dismiss: handleNotifDismiss } =
+    useNotificationPrompt({ enabled: !!currentUser, lang: settings.language, onGranted: onNotifGranted });
 
   // Merge cloud snapshot into local state — never deletes local-only items
   const mergeCloudData = useCallback((cloud: Awaited<ReturnType<typeof downloadData>>) => {
@@ -346,71 +320,6 @@ const App: React.FC = () => {
     checkKey();
   }, []);
 
-  // Re-schedule reminder on app load if previously enabled
-  useEffect(() => {
-    if (!currentUser) return;
-    try {
-      const saved = localStorage.getItem(NOTIF_KEY);
-      if (!saved) return;
-      const prefs = JSON.parse(saved);
-      if (prefs.enabled && Notification.permission === 'granted') {
-        // Wait for SW to be ready then schedule
-        navigator.serviceWorker?.ready.then(reg => {
-          reg.active?.postMessage({ type: 'SCHEDULE_REMINDER', hour: prefs.hour ?? 8, minute: 0, lang: settings.language });
-        }).catch(() => {});
-      }
-    } catch {}
-  }, [currentUser]); // eslint-disable-line
-
-  // Show notification prompt after 45s on first session if permission not yet decided
-  useEffect(() => {
-    if (!currentUser || notifPromptShownRef.current) return;
-    if (!('Notification' in window)) return;
-    try {
-      const saved = localStorage.getItem(NOTIF_KEY);
-      if (saved) return; // User already responded
-    } catch {}
-    if (Notification.permission !== 'default') return;
-    const timer = setTimeout(() => {
-      if (!notifPromptShownRef.current) {
-        notifPromptShownRef.current = true;
-        setShowNotifPrompt(true);
-      }
-    }, 45000);
-    return () => clearTimeout(timer);
-  }, [currentUser]);
-
-  const scheduleReminder = (hour: number) => {
-    try {
-      const reg = navigator.serviceWorker?.controller;
-      if (reg) {
-        reg.postMessage({ type: 'SCHEDULE_REMINDER', hour, minute: 0, lang: settings.language });
-      }
-    } catch {}
-  };
-
-  const handleNotifConfirm = async (hour: number) => {
-    setShowNotifPrompt(false);
-    try {
-      if (!('Notification' in window)) return;
-      const permission = await Notification.requestPermission();
-      const prefs = { enabled: permission === 'granted', hour, dismissedAt: null };
-      localStorage.setItem(NOTIF_KEY, JSON.stringify(prefs));
-      if (permission === 'granted') {
-        scheduleReminder(hour);
-        setGlobalError(t.notifGranted);
-        if (globalErrorTimerRef.current) clearTimeout(globalErrorTimerRef.current);
-        globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 4000);
-      }
-    } catch {}
-  };
-
-  const handleNotifDismiss = () => {
-    setShowNotifPrompt(false);
-    try {
-      localStorage.setItem(NOTIF_KEY, JSON.stringify({ enabled: false, dismissedAt: new Date().toISOString() }));
-    } catch {}
-  };
 
   // Debounced cloud push — reads from refs so no stale closure issues.
   // Records a pending marker when offline; the replay effect drains it on
@@ -470,34 +379,6 @@ const App: React.FC = () => {
     }
   }, [stats.cardsCreated, stats.streak, stats.stars, items, stories.length, currentUser]); // eslint-disable-line
 
-  // SW update event — fired from index.html when new SW is waiting
-  useEffect(() => {
-    const onSwUpdate = (e: Event) => {
-      swRegRef.current = (e as CustomEvent).detail as ServiceWorkerRegistration;
-      setShowUpdateToast(true);
-    };
-    window.addEventListener('swUpdateReady', onSwUpdate);
-    return () => window.removeEventListener('swUpdateReady', onSwUpdate);
-  }, []);
-
-  // Version polling — fetch /version.json every 5 min and compare buildTime
-  useEffect(() => {
-    if (!currentUser) return; // only poll when logged in
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) return;
-        const data: { buildTime: string } = await res.json();
-        if (data.buildTime && knownBuildTime.current && data.buildTime !== knownBuildTime.current) {
-          setShowUpdateToast(true);
-        }
-      } catch {}
-    };
-    // First check after 30s (give app time to fully load), then every 5 min
-    const initial = setTimeout(checkVersion, 30_000);
-    const interval = setInterval(checkVersion, 5 * 60_000);
-    return () => { clearTimeout(initial); clearInterval(interval); };
-  }, [currentUser]);
 
   const handleLogin = (profile: UserProfile, appSettings: AppSettings) => {
     setCurrentUser(profile);
@@ -900,7 +781,7 @@ const App: React.FC = () => {
       )}
 
       {/* ── App update toast ── */}
-      {showUpdateToast && (
+      {updateReady && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[400] animate-scale-up w-[92%] max-w-sm">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-blue-400">
             <span className="text-2xl shrink-0">🚀</span>
@@ -913,18 +794,12 @@ const App: React.FC = () => {
               </p>
             </div>
             <button
-              onClick={() => {
-                if (swRegRef.current?.waiting) {
-                  swRegRef.current.waiting.postMessage({ type: 'SKIP_WAITING' });
-                } else {
-                  window.location.reload();
-                }
-              }}
+              onClick={applyUpdate}
               className="shrink-0 px-4 py-2 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 active:scale-95 transition-all shadow-md"
             >
               {settings.language === 'vn' ? 'Cập nhật' : 'Update'}
             </button>
-            <button onClick={() => setShowUpdateToast(false)} className="shrink-0 p-1 hover:bg-white/20 rounded-lg transition-all">
+            <button onClick={dismissUpdate} aria-label="Đóng" className="shrink-0 p-1 hover:bg-white/20 rounded-lg transition-all">
               <XMarkIcon className="w-4 h-4" />
             </button>
           </div>
